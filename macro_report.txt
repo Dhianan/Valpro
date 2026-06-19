@@ -1,0 +1,198 @@
+==============================================================================
+  MACROECONOMIC CURRENCY ANALYSIS REPORT
+  Reference Date : 2026-06-19
+  Coverage       : CHF/INR · USD/INR (30-day) | EUR/USD · GBP/USD (7-day)
+==============================================================================
+
+------------------------------------------------------------------------------
+  A. STRUCTURAL MACROECONOMIC FACTORS
+------------------------------------------------------------------------------
+                     Policy Rate %  CPI %  Real Rate %  GDP Growth %  CA/GDP %  FX Res $bn  Debt/GDP % Rating
+Economy                                                                                                      
+India (INR)                   5.50    4.2         1.30           6.8      -1.8       680.0        83.0   BBB-
+Switzerland (CHF)             0.25    0.8        -0.55           1.4       8.5       850.0        27.0    AAA
+United States (USD)           4.25    2.6         1.65           2.1      -3.2       245.0       124.0    AA+
+
+  [India (INR)]
+    Capital Flow Bias : Moderate inflow (FDI + FPI)
+    Political Risk    : Moderate
+
+  [Switzerland (CHF)]
+    Capital Flow Bias : Safe-haven inflow during risk-off
+    Political Risk    : Very Low
+
+  [United States (USD)]
+    Capital Flow Bias : Reserve-currency anchor, moderate outflow pressure
+    Political Risk    : Moderate (trade policy uncertainty)
+
+------------------------------------------------------------------------------
+  B. INTEREST RATE DIFFERENTIALS (as of Jun-2026)
+------------------------------------------------------------------------------
+  RBI vs SNB (INR carry advantage over CHF)
+    Spread : 525 bps
+    View   : INR carry positive vs CHF
+    Impact : Supports CHF/INR upside (more INR needed per CHF appreciation)
+
+  Fed vs RBI (USD real-rate advantage)
+    Spread : -125 bps
+    View   : RBI nominally higher, Fed real-rate higher
+    Impact : USD/INR mildly supported by US real rate premium
+
+  Fed vs SNB
+    Spread : 400 bps
+    View   : Fed strongly higher
+    Impact : Limits CHF appreciation vs USD; CHF remains low-yield funding currency
+
+  Central Bank Stances:
+    ECB    | 2.50% | Mildly Dovish                | -25bps (Apr-2026, deposit rate → 2.50%)
+    BoE    | 4.75% | Cautiously Hawkish           | Hold at 4.75% (May-2026)
+    Fed    | 4.25% | Neutral / Easing Bias        | -25bps (Mar-2026, funds rate → 4.25%)
+    RBI    | 5.50% | Accommodative                | -25bps (Apr-2026, repo → 5.50%)
+    SNB    | 0.25% | Easing / Near-ZLB            | -25bps (Mar-2026, policy rate → 0.25%)
+
+------------------------------------------------------------------------------
+  C. CAPITAL FLOW ANALYSIS
+------------------------------------------------------------------------------
+  ▸ INR – Inflows
+      • FDI: Manufacturing PLI schemes, semiconductor & EV investments ($18bn est. FY2026)
+      • FPI Equity: EM re-rating; India weight in MSCI EM rose to ~19% (Jun-2026)
+      • Remittances: $118bn FY2026 (world's largest recipient)
+      • Services exports: IT & BPO surplus ~$180bn, structural USD buyer
+
+  ▸ INR – Outflows / Pressures
+      • Oil import bill: India imports ~88% of crude; WTI ~$72 adds $140bn/yr pressure
+      • Gold imports: Seasonal festival demand, BoP drain
+      • FPI Debt: Marginal; JP Morgan GBI-EM inclusion broadly priced in
+      • RBI cutting rates: Reduces nominal carry; may reduce hot-money inflows
+
+  ▸ CHF – Safe-Haven Dynamics
+      • SNB intervenes to cap excessive CHF strength (history: EUR/CHF floor removed 2015)
+      • Global risk-off → CHF demand spikes (geopolitical events, banking stress)
+      • Low yield = funding currency for carry trades; unwinding → CHF appreciation spikes
+      • CHF/INR driven primarily by USD/INR and CHF/USD cross; independent bilateral flow thin
+
+  ▸ USD – Structural Flows
+      • Dollar Milkshake: Global debt USD-denominated → structural USD demand
+      • Fed pivot reduces USD yield advantage; DXY trend mildly bearish since Oct-2025
+      • Trade tariff uncertainty (2025 escalation, 2026 partial rollback) creates volatility
+      • US twin deficits (fiscal 6.5% GDP + CA -3.2% GDP) = long-run USD pressure
+
+------------------------------------------------------------------------------
+  D. TECHNICAL ANALYSIS – EUR/USD & GBP/USD
+     (60-day history + 7-day crossover/RSI assessment)
+------------------------------------------------------------------------------
+
+  ── EUR/USD ──
+  Latest Close  : 1.1211
+  SMA-20        : 1.1032
+  SMA-50        : 1.0956
+  RSI-14        : 68.1
+  CB Overlay    : ECB (Mildly Dovish) → mildly EUR-negative; dovish bias caps EUR/USD upside
+
+  SMA-20/50 Crossover Events (60-day window):
+  Date              Close    SMA20    SMA50     RSI RSI Zone           Signal     Period
+  ------------------------------------------------------------------------------------------
+  2026-06-08       1.1007   1.0953   1.0923    55.9 Neutral            BULLISH    History
+
+
+  ── GBP/USD ──
+  Latest Close  : 1.3188
+  SMA-20        : 1.3343
+  SMA-50        : 1.3167
+  RSI-14        : 44.3
+  CB Overlay    : BoE (Cautiously Hawkish) → GBP-supportive; rate hold underpins GBP/USD
+
+  SMA-20/50 Crossover Events (60-day window):
+  Date              Close    SMA20    SMA50     RSI RSI Zone           Signal     Period
+  ------------------------------------------------------------------------------------------
+  2026-06-08       1.3406   1.3254   1.3097    63.8 Neutral            BULLISH    History
+  2026-07-04       1.3372   1.3221   1.3223    61.3 Neutral            BEARISH    Forecast
+  2026-07-11       1.3351   1.3274   1.3274    54.8 Neutral            BULLISH    Forecast
+
+------------------------------------------------------------------------------
+  E. 7-DAY TREND PROBABILITY REPORT – EUR/USD & GBP/USD
+------------------------------------------------------------------------------
+
+  ── EUR/USD (7-Day Forecast) ──
+  Pair          : EUR/USD
+  Horizon       : 7 calendar days
+  Current Spot  : 1.1211
+  Prob ↑ (Bull) : 62.8%
+  Prob ↓ (Bear) : 37.2%
+  Overall Bias  : BULLISH
+  Forecast Range:
+    5th  pct    : 1.1053
+   25th  pct    : 1.1165
+   50th  pct    : 1.1245  ← base case
+   75th  pct    : 1.1329
+   95th  pct    : 1.1448
+  CB Overlay    : ECB dovishness adds ~2% downside drift to EUR/USD probability
+
+
+  ── GBP/USD (7-Day Forecast) ──
+  Pair          : GBP/USD
+  Horizon       : 7 calendar days
+  Current Spot  : 1.3188
+  Prob ↑ (Bull) : 60.6%
+  Prob ↓ (Bear) : 39.4%
+  Overall Bias  : BULLISH
+  Forecast Range:
+    5th  pct    : 1.299
+   25th  pct    : 1.3133
+   50th  pct    : 1.323  ← base case
+   75th  pct    : 1.3326
+   95th  pct    : 1.3463
+  CB Overlay    : BoE hawkish hold adds ~1% upside tilt to GBP/USD probability
+
+------------------------------------------------------------------------------
+  F. 30-DAY DIRECTIONAL FORECAST – CHF/INR & USD/INR
+     (Monte Carlo Bootstrap + UIP Adjustment + Capital Flow Overlay)
+------------------------------------------------------------------------------
+
+  ── CHF/INR (30-Day Forecast) ──
+  Pair          : CHF/INR
+  Horizon       : 30 calendar days
+  Current Spot  : 95.2514
+  Prob ↑ (Bull) : 47.5%
+  Prob ↓ (Bear) : 52.5%
+  Overall Bias  : BEARISH
+  Forecast Range:
+    5th  pct    : 91.5609
+   25th  pct    : 93.5935
+   50th  pct    : 94.9345  ← base case
+   75th  pct    : 96.3386
+   95th  pct    : 98.3089
+  CB Overlay    : SNB near-ZLB + safe-haven demand → CHF/INR drifts higher; RBI rate cuts narrow carry but RBI FX intervention limits INR weakness
+
+
+  ── USD/INR (30-Day Forecast) ──
+  Pair          : USD/INR
+  Horizon       : 30 calendar days
+  Current Spot  : 86.3591
+  Prob ↑ (Bull) : 73.3%
+  Prob ↓ (Bear) : 26.7%
+  Overall Bias  : BULLISH
+  Forecast Range:
+    5th  pct    : 84.7067
+   25th  pct    : 86.3742
+   50th  pct    : 87.5659  ← base case
+   75th  pct    : 88.7916
+   95th  pct    : 90.56
+  CB Overlay    : Fed easing bias vs RBI hold → USD/INR mildly capped; strong FDI/remittance inflows + RBI FX sales contain upside
+
+------------------------------------------------------------------------------
+  G. DIRECTIONAL SUMMARY & KEY RISK EVENTS
+------------------------------------------------------------------------------
+  Pair       Horizon  Base Case                              Bull/Bear Driver                    Key Risk
+  ----------------------------------------------------------------------------------------------------------------------------------
+  CHF/INR    30-day   Mild upward drift (~+1.5–2.5%)         Global risk-off spike → CHF surges; RBI INR defence Geopolitical shock, SNB intervention, India macro miss
+  USD/INR    30-day   Range-bound / slight USD weakness (±0.8%) Strong INR support from FDI + remittances; Fed still cutting Oil price spike >$85, Fed pause/hawkish surprise, INR FPI outflow
+  EUR/USD    7-day    Slight downside bias (−0.3 to −0.8%)   ECB dovish pivot; ECB–Fed rate gap narrowing keeps EUR capped US NFP miss (bullish EUR), ECB inflation surprise
+  GBP/USD    7-day    Neutral-to-mildly bullish (+0.2 to +0.5%) BoE on hold; UK services inflation keeps GBP supported UK PMI contraction, surprise BoE cut signal, USD strength event
+
+==============================================================================
+  DISCLAIMER: This report is generated for analytical/educational purposes.
+  Simulated price series are calibrated to Jun-2026 indicative levels.
+  Not financial advice. Past performance and modelled outcomes do not
+  guarantee future results.
+==============================================================================
