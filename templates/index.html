@@ -6,9 +6,8 @@
   <title>ValPro · Currency Analysis Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/style.css" />
-  <!-- Chart.js + annotation plugin via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 </head>
@@ -17,15 +16,26 @@
 <!-- ── Header ──────────────────────────────────────────── -->
 <header>
   <div class="logo">
-    <div class="logo-icon">📊</div>
+    <div class="logo-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M3 17l4-8 4 4 4-6 4 10" stroke="white" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="19" cy="17" r="2" fill="white" opacity=".8"/>
+      </svg>
+    </div>
     <div>
       <h1>ValPro</h1>
       <p>Macroeconomic Currency Analysis</p>
     </div>
   </div>
-  <div class="header-meta">
-    <div><span class="live-dot"></span>Reference Date: <strong>{{ ref_date }}</strong></div>
-    <div style="margin-top:3px">CHF/INR · USD/INR · EUR/USD · GBP/USD</div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div id="live-rates-badge" style="display:none">
+      <span class="live-badge"><span class="live-dot"></span>LIVE RATES</span>
+    </div>
+    <div class="header-meta">
+      <div>Ref: <strong>{{ ref_date }}</strong></div>
+      <div style="margin-top:2px;font-size:.68rem">CHF/INR · USD/INR · EUR/USD · GBP/USD</div>
+    </div>
   </div>
 </header>
 
@@ -45,8 +55,11 @@
   <!-- ── OVERVIEW ─────────────────────────────────────── -->
   <section id="overview" class="active">
     <div class="section-title">Forecast Snapshot</div>
+    <div id="live-rates-note" style="font-size:.72rem;color:var(--muted);margin-bottom:12px;display:none">
+      <span style="color:var(--green)">●</span>
+      Spot prices fetched live from ECB via Frankfurter API · updated <span id="rates-timestamp">—</span>
+    </div>
     <div class="grid grid-4" id="kpi-cards">
-      <!-- populated by JS -->
       <div class="loading"><div class="spinner"></div>Loading…</div>
     </div>
 
@@ -394,9 +407,14 @@
     </div>
   </section>
 
-<footer style="text-align:center;padding:24px;color:var(--muted);font-size:.7rem;border-top:1px solid var(--border)">
-  ValPro · Macroeconomic Currency Analysis Dashboard · Reference {{ ref_date }} ·
-  Simulated data calibrated to indicative Jun-2026 levels · Not financial advice
+<footer style="text-align:center;padding:24px;color:var(--muted);font-size:.7rem;
+  border-top:1px solid var(--border);
+  background:linear-gradient(to top,rgba(139,92,246,.04),transparent)">
+  <span style="background:var(--grad-accent);-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    background-clip:text;font-weight:700">ValPro</span>
+  &nbsp;·&nbsp; Macroeconomic Currency Analysis &nbsp;·&nbsp; {{ ref_date }}
+  &nbsp;·&nbsp; Forecast model data, not financial advice
+  &nbsp;·&nbsp; Live spot rates via Frankfurter / ECB (browser fetch)
 </footer>
 
 <script src="/static/js/main.js"></script>

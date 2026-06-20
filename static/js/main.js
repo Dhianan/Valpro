@@ -1,34 +1,65 @@
 /* ── Globals ─────────────────────────────────────────── */
 const PAIR_COLORS = {
-  "CHF/INR": { price: "#bc8cff", sma20: "#58a6ff", sma50: "#f85149", rsi: "#d29922" },
-  "USD/INR": { price: "#39d353", sma20: "#58a6ff", sma50: "#f85149", rsi: "#d29922" },
-  "EUR/USD": { price: "#58a6ff", sma20: "#bc8cff", sma50: "#f85149", rsi: "#d29922" },
-  "GBP/USD": { price: "#3fb950", sma20: "#58a6ff", sma50: "#f85149", rsi: "#d29922" },
+  "CHF/INR": { price: "#a78bfa", sma20: "#60a5fa", sma50: "#f87171", rsi: "#fbbf24" },
+  "USD/INR": { price: "#4ade80", sma20: "#60a5fa", sma50: "#f87171", rsi: "#fbbf24" },
+  "EUR/USD": { price: "#818cf8", sma20: "#a78bfa", sma50: "#f87171", rsi: "#fbbf24" },
+  "GBP/USD": { price: "#34d399", sma20: "#60a5fa", sma50: "#f87171", rsi: "#fbbf24" },
 };
 const CHART_DEFAULTS = {
   animation: false,
   plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
   scales: {
     x: {
-      ticks: { color: "#8b949e", font: { size: 10 }, maxRotation: 0, maxTicksLimit: 8 },
-      grid:  { color: "rgba(48,54,61,.5)" },
+      ticks: { color: "#8b7ec8", font: { size: 10 }, maxRotation: 0, maxTicksLimit: 8 },
+      grid:  { color: "rgba(45,27,105,.4)" },
     },
     y: {
-      ticks: { color: "#8b949e", font: { size: 10 } },
-      grid:  { color: "rgba(48,54,61,.5)" },
+      ticks: { color: "#8b7ec8", font: { size: 10 } },
+      grid:  { color: "rgba(45,27,105,.4)" },
     },
   },
 };
 
 const charts = {};
-let macroData   = null;
-let forecastData= null;
-let seriesCache = {};
+let macroData    = null;
+let forecastData = null;
+let seriesCache  = {};
+let liveRates    = null;   // { "USD/INR": 84.21, "CHF/INR": 96.4, "EUR/USD": 1.094, "GBP/USD": 1.279, timestamp }
 
 /* ── Fetch helpers ─────────────────────────────────────── */
 async function get(url) {
   const r = await fetch(url);
   return r.json();
+}
+
+/* ── Live FX rates via Frankfurter (ECB) ──────────────── */
+async function fetchLiveRates() {
+  try {
+    const r = await fetch(
+      "https://api.frankfurter.app/latest?from=USD&to=INR,CHF,EUR,GBP",
+      { signal: AbortSignal.timeout(6000) }
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    const rates = d.rates;
+    liveRates = {
+      "USD/INR": parseFloat(rates.INR.toFixed(4)),
+      "CHF/INR": parseFloat((rates.INR / rates.CHF).toFixed(4)),
+      "EUR/USD": parseFloat((1 / rates.EUR).toFixed(4)),
+      "GBP/USD": parseFloat((1 / rates.GBP).toFixed(4)),
+      timestamp: d.date,
+    };
+    // Show live badge + note
+    const badge = document.getElementById("live-rates-badge");
+    const note  = document.getElementById("live-rates-note");
+    const ts    = document.getElementById("rates-timestamp");
+    if (badge) badge.style.display = "block";
+    if (note)  note.style.display  = "block";
+    if (ts)    ts.textContent = liveRates.timestamp;
+    return liveRates;
+  } catch {
+    return null;  // silently fall back to model spot
+  }
 }
 
 /* ── Nav ─────────────────────────────────────────────── */
@@ -195,9 +226,9 @@ function renderRSIChart(pair, series, canvasId) {
       },
       annotation: {
         annotations: {
-          ob: { type: "line", yMin: 70, yMax: 70, borderColor: "#f85149", borderWidth: 1, borderDash: [4,4] },
-          os: { type: "line", yMin: 30, yMax: 30, borderColor: "#3fb950", borderWidth: 1, borderDash: [4,4] },
-          mid: { type: "line", yMin: 50, yMax: 50, borderColor: "#30363d", borderWidth: 1 },
+          ob: { type: "line", yMin: 70, yMax: 70, borderColor: "#f87171", borderWidth: 1, borderDash: [4,4] },
+          os: { type: "line", yMin: 30, yMax: 30, borderColor: "#4ade80", borderWidth: 1, borderDash: [4,4] },
+          mid: { type: "line", yMin: 50, yMax: 50, borderColor: "#2d1b69", borderWidth: 1 },
         },
       },
     },
@@ -206,7 +237,7 @@ function renderRSIChart(pair, series, canvasId) {
       y: {
         ...CHART_DEFAULTS.scales.y,
         min: 0, max: 100,
-        title: { display: true, text: "RSI-14", color: "#8b949e", font: { size: 11 } },
+        title: { display: true, text: "RSI-14", color: "#8b7ec8", font: { size: 11 } },
       },
     },
   });
@@ -220,7 +251,7 @@ function renderGaugeChart(pair, canvasId, probData) {
     labels: ["Bullish", "Bearish"],
     datasets: [{
       data: [up, down],
-      backgroundColor: ["#3fb950cc", "#f85149cc"],
+      backgroundColor: ["rgba(74,222,128,.75)", "rgba(248,113,113,.75)"],
       borderWidth: 0,
       hoverOffset: 4,
     }],
@@ -319,36 +350,43 @@ async function loadOverview() {
   const fcast = forecastData || await get("/api/forecast");
   forecastData = fcast;
 
-  // KPI cards
+  // KPI cards — violet-bloom style with live-rate overlay
   const pairs = [
-    { pair: "CHF/INR", horizon: "30d" },
-    { pair: "USD/INR", horizon: "30d" },
-    { pair: "EUR/USD", horizon: "7d" },
-    { pair: "GBP/USD", horizon: "7d" },
+    { pair: "CHF/INR", horizon: "30d", glowColor: "#a78bfa" },
+    { pair: "USD/INR", horizon: "30d", glowColor: "#4ade80" },
+    { pair: "EUR/USD", horizon: "7d",  glowColor: "#818cf8" },
+    { pair: "GBP/USD", horizon: "7d",  glowColor: "#34d399" },
   ];
   const kpiWrap = document.getElementById("kpi-cards");
-  kpiWrap.innerHTML = pairs.map(({ pair, horizon }) => {
-    const p = fcast[pair];
-    const bias   = p.prob_up_pct >= 50 ? "BULLISH" : "BEARISH";
-    const bclass = p.prob_up_pct >= 50 ? "badge-green" : "badge-red";
-    const sign   = p.prob_up_pct >= 50 ? "▲" : "▼";
-    const pct    = p.prob_up_pct >= 50 ? p.prob_up_pct : p.prob_dn_pct;
-    const delta  = (((p.p50 - p.current_spot) / p.current_spot) * 100).toFixed(2);
-    const dcolor = delta >= 0 ? "var(--green)" : "var(--red)";
+  kpiWrap.innerHTML = pairs.map(({ pair, horizon, glowColor }) => {
+    const p       = fcast[pair];
+    const spot    = liveRates?.[pair] ?? p.current_spot;
+    const isLive  = !!(liveRates?.[pair]);
+    const bias    = p.prob_up_pct >= 50 ? "BULLISH" : "BEARISH";
+    const bclass  = p.prob_up_pct >= 50 ? "badge-green" : "badge-red";
+    const arrow   = p.prob_up_pct >= 50 ? "↑" : "↓";
+    const pct     = p.prob_up_pct >= 50 ? p.prob_up_pct : p.prob_dn_pct;
+    const p50     = p.p50;
+    const delta   = (((p50 - spot) / spot) * 100).toFixed(2);
+    const dcolor  = delta >= 0 ? "var(--green)" : "var(--red)";
     return `
-      <div class="card">
-        <div class="card-title">${pair} · ${horizon} forecast</div>
-        <div class="stat">
-          <div class="value">${p.current_spot}</div>
-          <div class="sub" style="color:${dcolor}">
-            P50 ${p.p50} (${delta >= 0 ? "+" : ""}${delta}%)
+      <div class="kpi-card">
+        <div class="corner-glow" style="background:${glowColor}"></div>
+        <div class="pair-label">${pair} &nbsp;·&nbsp; ${horizon} forecast</div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div class="spot-price">${spot}</div>
+          <div class="live-tag">
+            ${isLive
+              ? `<span class="live-badge"><span class="live-dot"></span>LIVE</span>`
+              : `<span style="font-size:.64rem;color:var(--muted)">MODEL</span>`}
           </div>
-          <div style="margin-top:10px">
-            <span class="badge ${bclass}">${sign} ${bias} ${pct}%</span>
-          </div>
-          <div style="font-size:.68rem;color:var(--muted);margin-top:6px">
-            Range: ${p.p5} – ${p.p95}
-          </div>
+        </div>
+        <div class="p50-line" style="color:${dcolor}">
+          P50 ${p50} &nbsp;<span style="font-size:.72rem">(${delta >= 0 ? "+" : ""}${delta}%)</span>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between">
+          <span class="badge ${bclass}">${arrow} ${bias} ${pct}%</span>
+          <span style="font-size:.68rem;color:var(--muted)">${p.p5} – ${p.p95}</span>
         </div>
       </div>`;
   }).join("");
@@ -1022,11 +1060,14 @@ function initWhatIf() {
 
 /* ── Boot ────────────────────────────────────────────────── */
 async function boot() {
-  // pre-fetch
+  // pre-fetch model data + live rates in parallel
   [macroData, forecastData] = await Promise.all([
     get("/api/macro"),
     get("/api/forecast"),
   ]);
+
+  // attempt live rates (non-blocking — falls back to model spot silently)
+  fetchLiveRates();   // fire and forget; loadOverview re-reads liveRates
 
   await loadOverview();
 
