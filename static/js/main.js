@@ -511,6 +511,351 @@ async function loadForecast(pair) {
     <span style="color:var(--green)">${p.p95}</span>`;
 }
 
+/* ── SECTION: What If ───────────────────────────────────── */
+
+const WI_RATE_FACTORS = {
+  "CHF/INR": [
+    { id: "rbi_rate_delta",  label: "RBI Rate Δ (bps)",  min: -100, max: 100 },
+    { id: "snb_rate_delta",  label: "SNB Rate Δ (bps)",  min: -50,  max: 50  },
+  ],
+  "USD/INR": [
+    { id: "rbi_rate_delta",  label: "RBI Rate Δ (bps)",  min: -100, max: 100 },
+    { id: "fed_rate_delta",  label: "Fed Rate Δ (bps)",  min: -100, max: 100 },
+  ],
+  "EUR/USD": [
+    { id: "ecb_rate_delta",  label: "ECB Rate Δ (bps)",  min: -100, max: 100 },
+    { id: "fed_rate_delta",  label: "Fed Rate Δ (bps)",  min: -100, max: 100 },
+  ],
+  "GBP/USD": [
+    { id: "boe_rate_delta",  label: "BoE Rate Δ (bps)",  min: -100, max: 100 },
+    { id: "fed_rate_delta",  label: "Fed Rate Δ (bps)",  min: -100, max: 100 },
+  ],
+};
+
+const PRESETS = {
+  "oil-spike":  { oil_price_delta: 38, risk_sentiment: -1 },
+  "risk-off":   { risk_sentiment: -3, oil_price_delta: 10 },
+  "fed-pause":  { fed_rate_delta: 50 },
+  "rbi-cut":    { rbi_rate_delta: -50 },
+  "fpi-exit":   { fpi_flow_delta: -5, risk_sentiment: -1 },
+  "reset":      {},
+};
+
+let wiPair    = "USD/INR";
+let wiHorizon = 30;
+let wiParams  = {};
+
+function wiGetParams() {
+  const p = {};
+  // rate sliders
+  document.querySelectorAll(".wi-rate-slider").forEach(el => {
+    p[el.dataset.factor] = parseFloat(el.value);
+  });
+  p.oil_price_delta = parseFloat(document.getElementById("wi-oil")?.value || 0);
+  p.risk_sentiment  = parseFloat(document.getElementById("wi-risk")?.value || 0);
+  p.fpi_flow_delta  = parseFloat(document.getElementById("wi-fpi")?.value || 0);
+  return p;
+}
+
+function wiSetSliders(overrides = {}) {
+  document.querySelectorAll(".wi-rate-slider").forEach(el => {
+    el.value = overrides[el.dataset.factor] ?? 0;
+    el.dispatchEvent(new Event("input"));
+  });
+  ["oil", "risk", "fpi"].forEach(k => {
+    const factorMap = { oil: "oil_price_delta", risk: "risk_sentiment", fpi: "fpi_flow_delta" };
+    const el = document.getElementById(`wi-${k}`);
+    if (el) { el.value = overrides[factorMap[k]] ?? 0; el.dispatchEvent(new Event("input")); }
+  });
+}
+
+function buildRateSliders(pair) {
+  const wrap = document.getElementById("wi-rate-sliders");
+  if (!wrap) return;
+  const factors = WI_RATE_FACTORS[pair] || [];
+  wrap.innerHTML = factors.map(f => `
+    <label class="wi-label">${f.label}
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="range" class="wi-rate-slider wi-slider"
+               data-factor="${f.id}" min="${f.min}" max="${f.max}" value="0" step="5">
+        <span class="wi-val" id="wi-val-${f.id}">0</span>
+      </div>
+    </label>
+  `).join("");
+
+  wrap.querySelectorAll(".wi-rate-slider").forEach(el => {
+    el.addEventListener("input", () => {
+      const valEl = document.getElementById(`wi-val-${el.dataset.factor}`);
+      if (valEl) valEl.textContent = el.value > 0 ? `+${el.value}` : el.value;
+    });
+  });
+}
+
+async function runWhatIf() {
+  wiParams = wiGetParams();
+  const hasChange = Object.values(wiParams).some(v => v !== 0);
+
+  document.getElementById("wi-loading").style.display = "flex";
+
+  const res = await fetch("/api/whatif", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pair: wiPair, horizon: wiHorizon, params: wiParams }),
+  });
+  const d = await res.json();
+  document.getElementById("wi-loading").style.display = "none";
+
+  renderWiFanChart(d);
+  renderWiKpi(d);
+  renderWiProbDelta(d);
+  renderWiModelParams(d, hasChange);
+}
+
+function renderWiFanChart(d) {
+  const { dates, base, scenario } = d;
+  const col = PAIR_COLORS[d.pair] || PAIR_COLORS["EUR/USD"];
+
+  if (charts["wi-fan-chart"]) charts["wi-fan-chart"].destroy();
+  charts["wi-fan-chart"] = new Chart(document.getElementById("wi-fan-chart"), {
+    type: "line",
+    data: {
+      labels: dates,
+      datasets: [
+        // Scenario P25–P75 fill band
+        {
+          label: "Scenario P75",
+          data: scenario.fan.p75,
+          borderColor: "transparent",
+          backgroundColor: "rgba(248,81,73,0.12)",
+          fill: "+1",
+          pointRadius: 0,
+          tension: 0.3,
+        },
+        {
+          label: "Scenario P25",
+          data: scenario.fan.p25,
+          borderColor: "transparent",
+          backgroundColor: "rgba(248,81,73,0.12)",
+          fill: false,
+          pointRadius: 0,
+          tension: 0.3,
+        },
+        // Base P25–P75 fill band
+        {
+          label: "Base P75",
+          data: base.fan.p75,
+          borderColor: "transparent",
+          backgroundColor: "rgba(88,166,255,0.08)",
+          fill: "+1",
+          pointRadius: 0,
+          tension: 0.3,
+        },
+        {
+          label: "Base P25",
+          data: base.fan.p25,
+          borderColor: "transparent",
+          backgroundColor: "rgba(88,166,255,0.08)",
+          fill: false,
+          pointRadius: 0,
+          tension: 0.3,
+        },
+        // Base P50
+        {
+          label: "Base P50",
+          data: base.fan.p50,
+          borderColor: "#8b949e",
+          borderWidth: 2,
+          borderDash: [5, 3],
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false,
+        },
+        // Scenario P50
+        {
+          label: "Scenario P50",
+          data: scenario.fan.p50,
+          borderColor: "#f85149",
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode: "index", intersect: false,
+          callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(4)}` }
+        },
+      },
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        y: { ...CHART_DEFAULTS.scales.y,
+          title: { display: true, text: d.pair, color: "#8b949e", font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+function renderWiKpi(d) {
+  const el = document.getElementById("wi-kpi");
+  const { base, scenario } = d;
+  const probDelta = (scenario.prob_up_pct - base.prob_up_pct).toFixed(1);
+  const p50Delta  = (scenario.p50 - base.p50).toFixed(4);
+  const p50DeltaPct = (((scenario.p50 - base.p50) / base.p50) * 100).toFixed(2);
+
+  const pill = (v, suffix = "") => {
+    const cls = v > 0 ? "delta-pos" : v < 0 ? "delta-neg" : "delta-neu";
+    return `<span class="delta-pill ${cls}">${v > 0 ? "+" : ""}${v}${suffix}</span>`;
+  };
+
+  el.innerHTML = `
+    <div class="card stat">
+      <div class="card-title">Bullish Probability</div>
+      <div class="value">${scenario.prob_up_pct}%</div>
+      <div class="sub">Base: ${base.prob_up_pct}% &nbsp; ${pill(+probDelta, "%")}</div>
+    </div>
+    <div class="card stat">
+      <div class="card-title">Base-Case Price (P50)</div>
+      <div class="value" style="font-size:1.4rem">${scenario.p50}</div>
+      <div class="sub">Base: ${base.p50} &nbsp; ${pill(+p50DeltaPct, "%")}</div>
+    </div>
+    <div class="card stat">
+      <div class="card-title">Bear Tail (P5)</div>
+      <div class="value" style="font-size:1.3rem;color:var(--red)">${scenario.p5}</div>
+      <div class="sub">Base: ${base.p5} &nbsp; ${pill(+(scenario.p5 - base.p5).toFixed(4))}</div>
+    </div>
+    <div class="card stat">
+      <div class="card-title">Bull Tail (P95)</div>
+      <div class="value" style="font-size:1.3rem;color:var(--green)">${scenario.p95}</div>
+      <div class="sub">Base: ${base.p95} &nbsp; ${pill(+(scenario.p95 - base.p95).toFixed(4))}</div>
+    </div>
+  `;
+}
+
+function renderWiProbDelta(d) {
+  const el   = document.getElementById("wi-prob-delta");
+  const b    = d.base;
+  const s    = d.scenario;
+  const upD  = (s.prob_up_pct - b.prob_up_pct).toFixed(1);
+  const dnD  = (s.prob_dn_pct - b.prob_dn_pct).toFixed(1);
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:6px">Base Case</div>
+        <div class="prob-row">
+          <span class="prob-label">Bullish ↑</span>
+          <div class="prob-bar-wrap"><div class="prob-bar"
+            style="width:${b.prob_up_pct}%;background:var(--green)"></div></div>
+          <span class="prob-val" style="color:var(--green)">${b.prob_up_pct}%</span>
+        </div>
+        <div class="prob-row">
+          <span class="prob-label">Bearish ↓</span>
+          <div class="prob-bar-wrap"><div class="prob-bar"
+            style="width:${b.prob_dn_pct}%;background:var(--red)"></div></div>
+          <span class="prob-val" style="color:var(--red)">${b.prob_dn_pct}%</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:6px">
+          Scenario &nbsp;
+          <span class="delta-pill ${upD > 0 ? "delta-pos" : upD < 0 ? "delta-neg" : "delta-neu"}">
+            ${upD > 0 ? "+" : ""}${upD}% bull shift
+          </span>
+        </div>
+        <div class="prob-row">
+          <span class="prob-label">Bullish ↑</span>
+          <div class="prob-bar-wrap"><div class="prob-bar"
+            style="width:${s.prob_up_pct}%;background:var(--green)"></div></div>
+          <span class="prob-val" style="color:var(--green)">${s.prob_up_pct}%</span>
+        </div>
+        <div class="prob-row">
+          <span class="prob-label">Bearish ↓</span>
+          <div class="prob-bar-wrap"><div class="prob-bar"
+            style="width:${s.prob_dn_pct}%;background:var(--red)"></div></div>
+          <span class="prob-val" style="color:var(--red)">${s.prob_dn_pct}%</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderWiModelParams(d, hasChange) {
+  const el = document.getElementById("wi-model-params");
+  const b  = d.base;
+  const s  = d.scenario;
+  const driftDelta = (s.adj_drift_pct - b.adj_drift_pct).toFixed(3);
+  const volDelta   = (s.adj_vol_pct   - b.adj_vol_pct).toFixed(3);
+  const dCol = driftDelta > 0 ? "var(--green)" : driftDelta < 0 ? "var(--red)" : "var(--muted)";
+  const vCol = volDelta   > 0 ? "var(--yellow)": "var(--muted)";
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px">
+      <span>Annual Drift (base)</span>  <span>${b.adj_drift_pct}%</span>
+      <span>Annual Drift (scenario)</span>
+        <span style="color:${dCol};font-weight:700">${s.adj_drift_pct}%
+          (${driftDelta > 0 ? "+" : ""}${driftDelta}%)</span>
+      <span>Annual Vol (base)</span>    <span>${b.adj_vol_pct}%</span>
+      <span>Annual Vol (scenario)</span>
+        <span style="color:${vCol};font-weight:700">${s.adj_vol_pct}%
+          (${volDelta > 0 ? "+" : ""}${volDelta}%)</span>
+    </div>
+    ${!hasChange ? `<p style="margin-top:10px;font-style:italic">
+      Scenario matches base — adjust sliders or pick a preset to see divergence.</p>` : ""}
+  `;
+}
+
+function initWhatIf() {
+  // Pair tabs
+  setupPairTabs("#wi-pair-tabs", ["CHF/INR", "USD/INR", "EUR/USD", "GBP/USD"], async (pair) => {
+    wiPair = pair;
+    wiSetSliders({});
+    buildRateSliders(pair);
+    await runWhatIf();
+  });
+
+  buildRateSliders(wiPair);
+
+  // Horizon slider
+  const hSlider = document.getElementById("wi-horizon");
+  const hVal    = document.getElementById("wi-horizon-val");
+  hSlider?.addEventListener("input", () => {
+    wiHorizon = parseInt(hSlider.value);
+    hVal.textContent = `${wiHorizon} days`;
+  });
+  hSlider?.addEventListener("change", runWhatIf);
+
+  // Macro sliders — live update label, run on release
+  [
+    { id: "wi-oil",  valId: "wi-oil-val",  fmt: v => (v > 0 ? `+$${v}` : `$${v}`) },
+    { id: "wi-risk", valId: "wi-risk-val", fmt: v => (v > 0 ? `+${v}` : `${v}`) },
+    { id: "wi-fpi",  valId: "wi-fpi-val",  fmt: v => (v > 0 ? `+$${v}bn` : `$${v}bn`) },
+  ].forEach(({ id, valId, fmt }) => {
+    const el  = document.getElementById(id);
+    const val = document.getElementById(valId);
+    el?.addEventListener("input",  () => { if (val) val.textContent = fmt(el.value); });
+    el?.addEventListener("change", runWhatIf);
+  });
+
+  // Rate sliders — run on release (built dynamically, use delegation)
+  document.getElementById("wi-rate-sliders")?.addEventListener("change", runWhatIf);
+
+  // Presets
+  document.querySelectorAll(".wi-preset").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const overrides = PRESETS[btn.dataset.preset] || {};
+      wiSetSliders(overrides);
+      await runWhatIf();
+    });
+  });
+
+  // Initial run
+  runWhatIf();
+}
+
 /* ── Boot ────────────────────────────────────────────────── */
 async function boot() {
   // pre-fetch
@@ -531,6 +876,9 @@ async function boot() {
 
   // Macro section (lazy load when tab clicked)
   document.querySelector("[data-section='macro']")?.addEventListener("click", loadMacro, { once: true });
+
+  // What If section (lazy init when tab clicked)
+  document.querySelector("[data-section='whatif']")?.addEventListener("click", initWhatIf, { once: true });
 }
 
 document.addEventListener("DOMContentLoaded", boot);

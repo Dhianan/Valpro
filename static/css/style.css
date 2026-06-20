@@ -257,6 +257,36 @@ td.num { font-variant-numeric: tabular-nums; text-align: right; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── What If controls ────────────────────────────────── */
+.wi-label {
+  display: block; font-size: .75rem; color: var(--muted);
+  margin-bottom: 12px;
+}
+.wi-slider {
+  flex: 1; accent-color: var(--accent);
+  cursor: pointer;
+}
+.wi-val {
+  min-width: 40px; text-align: right;
+  font-size: .78rem; font-weight: 700; color: var(--accent);
+}
+.wi-preset {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); padding: 7px 12px;
+  border-radius: var(--radius); cursor: pointer; font-size: .78rem;
+  text-align: left; transition: all .15s;
+}
+.wi-preset:hover { border-color: var(--accent); color: var(--accent); }
+
+/* delta pill */
+.delta-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 20px; font-size: .75rem; font-weight: 700;
+}
+.delta-pos { background: rgba(63,185,80,.15); color: var(--green); }
+.delta-neg { background: rgba(248,81,73,.15);  color: var(--red); }
+.delta-neu { background: rgba(139,148,158,.1); color: var(--muted); }
+
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 640px) {
   header { padding: 14px 16px; }

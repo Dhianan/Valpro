@@ -35,6 +35,7 @@
   <button data-section="macro">Macro Factors</button>
   <button data-section="technical">Technical Analysis</button>
   <button data-section="forecast">Forecasts</button>
+  <button data-section="whatif">What If</button>
 </nav>
 
 <!-- ── Main ────────────────────────────────────────────── -->
@@ -237,6 +238,112 @@
   </section>
 
 </main>
+
+  <!-- ── WHAT IF ──────────────────────────────────────── -->
+  <section id="whatif">
+    <div class="section-title">What If Scenario Analysis</div>
+    <p style="color:var(--muted);font-size:.8rem;margin-bottom:20px">
+      Adjust macro parameters below and see how the Monte Carlo forecast shifts versus the base case.
+      Each slider maps to a calibrated sensitivity coefficient per pair.
+    </p>
+
+    <div class="grid" style="grid-template-columns:340px 1fr;gap:20px;align-items:start">
+
+      <!-- Controls -->
+      <div>
+        <!-- Pair + Horizon -->
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-title">Pair & Horizon</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="wi-pair-tabs"></div>
+          <label style="font-size:.75rem;color:var(--muted)">Horizon (days)
+            <input type="range" id="wi-horizon" min="5" max="60" value="30" step="5"
+                   style="width:100%;margin-top:4px">
+            <span id="wi-horizon-val" style="color:var(--accent);font-weight:700">30 days</span>
+          </label>
+        </div>
+
+        <!-- Rate shocks -->
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-title">Rate Shocks (bps from base)</div>
+          <div id="wi-rate-sliders"></div>
+        </div>
+
+        <!-- Macro shocks -->
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-title">Macro Shocks</div>
+
+          <label class="wi-label">Oil Price Δ ($/bbl from ~$72)
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="range" id="wi-oil" min="-30" max="40" value="0" step="2" class="wi-slider">
+              <span class="wi-val" id="wi-oil-val">0</span>
+            </div>
+          </label>
+
+          <label class="wi-label">Risk Sentiment (−3 risk-off … +3 risk-on)
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="range" id="wi-risk" min="-3" max="3" value="0" step="0.5" class="wi-slider">
+              <span class="wi-val" id="wi-risk-val">0</span>
+            </div>
+          </label>
+
+          <label class="wi-label">Net FPI Flow Δ ($bn/month)
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="range" id="wi-fpi" min="-8" max="8" value="0" step="0.5" class="wi-slider">
+              <span class="wi-val" id="wi-fpi-val">0</span>
+            </div>
+          </label>
+        </div>
+
+        <!-- Preset scenarios -->
+        <div class="card">
+          <div class="card-title">Quick Presets</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="wi-preset" data-preset="oil-spike">🛢 Oil spike to $110</button>
+            <button class="wi-preset" data-preset="risk-off">⚡ Global risk-off shock</button>
+            <button class="wi-preset" data-preset="fed-pause">🏦 Fed pauses (hawkish surprise)</button>
+            <button class="wi-preset" data-preset="rbi-cut">📉 RBI cuts 50bps</button>
+            <button class="wi-preset" data-preset="fpi-exit">💸 $5bn FPI outflow</button>
+            <button class="wi-preset" data-preset="reset">↺ Reset to base</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div>
+        <div id="wi-loading" class="loading" style="display:none">
+          <div class="spinner"></div>Running scenario…
+        </div>
+
+        <!-- KPI comparison -->
+        <div class="grid grid-2" style="margin-bottom:16px" id="wi-kpi"></div>
+
+        <!-- Fan chart -->
+        <div class="chart-container" style="margin-bottom:16px">
+          <div class="chart-header">
+            <h3>Forecast Fan Chart</h3>
+            <div class="legend">
+              <div class="legend-item"><div class="legend-dot" style="background:#8b949e"></div>Base P50</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#f85149"></div>Scenario P50</div>
+              <div class="legend-item" style="font-size:.68rem;color:var(--muted)">shaded = P25–P75 band</div>
+            </div>
+          </div>
+          <canvas id="wi-fan-chart" height="100"></canvas>
+        </div>
+
+        <!-- Probability delta -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title">Probability Shift vs Base</div>
+          <div id="wi-prob-delta"></div>
+        </div>
+
+        <!-- Adjusted parameters display -->
+        <div class="card">
+          <div class="card-title">Adjusted Model Parameters</div>
+          <div id="wi-model-params" style="font-size:.75rem;color:var(--muted);line-height:2"></div>
+        </div>
+      </div>
+    </div>
+  </section>
 
 <footer style="text-align:center;padding:24px;color:var(--muted);font-size:.7rem;border-top:1px solid var(--border)">
   ValPro · Macroeconomic Currency Analysis Dashboard · Reference {{ ref_date }} ·

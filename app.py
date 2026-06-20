@@ -1,11 +1,13 @@
 """Flask web server for the Macroeconomic Currency Analysis Dashboard."""
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from currency_analysis import (
     build_fx_dataset,
     detect_crossovers,
     monte_carlo_probability,
     rate_differential_adjustment,
+    whatif_forecast,
+    WHATIF_DEFAULTS,
     MACRO_DATA,
     RATE_DIFFERENTIALS,
     CB_STANCE,
@@ -106,6 +108,48 @@ def api_forecast():
         "CHF/INR": _prob_payload("CHF/INR", 30, seed=2),
         "USD/INR": _prob_payload("USD/INR", 30, seed=2),
     })
+
+
+@app.route("/api/whatif", methods=["POST"])
+def api_whatif():
+    body    = request.get_json(force=True) or {}
+    pair    = body.get("pair", "USD/INR")
+    horizon = int(body.get("horizon", 30))
+
+    if pair not in _datasets:
+        return jsonify({"error": "unknown pair"}), 400
+
+    # Build params: start from defaults, overlay user values
+    params = {**WHATIF_DEFAULTS, **{k: float(v) for k, v in body.get("params", {}).items()}}
+
+    df   = _datasets[pair]
+    hist = df[df["Period"] == "History"]
+    spot = float(hist["Close"].iloc[-1])
+
+    # Base case (zero deltas) for comparison
+    base = whatif_forecast(pair, WHATIF_DEFAULTS, horizon, spot, seed=7)
+
+    # Scenario case
+    scenario = whatif_forecast(pair, params, horizon, spot, seed=7)
+
+    # Forecast date labels
+    from datetime import timedelta
+    dates = [(REF_DATE + timedelta(days=i + 1)).strftime("%Y-%m-%d")
+             for i in range(horizon)]
+
+    return jsonify({
+        "pair":     pair,
+        "horizon":  horizon,
+        "dates":    dates,
+        "base":     base,
+        "scenario": scenario,
+        "params":   params,
+    })
+
+
+@app.route("/api/whatif/defaults")
+def api_whatif_defaults():
+    return jsonify(WHATIF_DEFAULTS)
 
 
 if __name__ == "__main__":

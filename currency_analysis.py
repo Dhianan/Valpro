@@ -255,6 +255,133 @@ def rate_differential_adjustment(pair: str) -> float:
 
 
 # ─────────────────────────────────────────────────────────
+# SECTION 4b – WHAT-IF SCENARIO ENGINE
+# ─────────────────────────────────────────────────────────
+
+# Base calibration anchors (annual figures used for drift derivation)
+_BASE = {
+    "CHF/INR": {"mu": 0.04,  "sigma": 0.07},
+    "USD/INR": {"mu": -0.01, "sigma": 0.05},
+    "EUR/USD": {"mu": 0.02,  "sigma": 0.07},
+    "GBP/USD": {"mu": 0.01,  "sigma": 0.08},
+}
+
+# Per-pair sensitivity coefficients (annual drift impact per unit)
+_SENSITIVITY = {
+    # pair: {factor: drift_delta_per_unit}
+    "USD/INR": {
+        "rbi_rate_delta":   -0.008,   # +100bps RBI → INR stronger → USD/INR falls ~0.8%/yr
+        "fed_rate_delta":   +0.006,   # +100bps Fed → USD stronger
+        "oil_price_delta":  +0.003,   # +$10 oil → USD/INR rises ~0.3%/yr (import pressure)
+        "risk_sentiment":   -0.015,   # +1 risk-on → INR inflows → USD/INR falls
+        "fpi_flow_delta":   -0.002,   # +$1bn FPI/month → INR demand → USD/INR falls
+    },
+    "CHF/INR": {
+        "rbi_rate_delta":   -0.006,
+        "snb_rate_delta":   +0.005,
+        "oil_price_delta":  +0.002,
+        "risk_sentiment":   -0.025,   # risk-off → CHF safe-haven surge
+        "fpi_flow_delta":   -0.001,
+    },
+    "EUR/USD": {
+        "ecb_rate_delta":   -0.007,   # ECB cut → EUR weaker
+        "fed_rate_delta":   +0.008,
+        "risk_sentiment":   +0.005,   # risk-on → mild EUR positive
+        "oil_price_delta":  -0.001,
+        "fpi_flow_delta":    0.000,
+    },
+    "GBP/USD": {
+        "boe_rate_delta":   -0.009,
+        "fed_rate_delta":   +0.007,
+        "risk_sentiment":   +0.004,
+        "oil_price_delta":  -0.001,
+        "fpi_flow_delta":    0.000,
+    },
+}
+
+# Volatility multipliers for risk-sentiment extremes
+_VOL_MULTIPLIER = {
+    "CHF/INR": lambda rs: 1.0 + max(0, -rs) * 0.18,   # risk-off spikes CHF vol
+    "USD/INR": lambda rs: 1.0 + abs(rs) * 0.06,
+    "EUR/USD": lambda rs: 1.0 + abs(rs) * 0.05,
+    "GBP/USD": lambda rs: 1.0 + abs(rs) * 0.05,
+}
+
+WHATIF_DEFAULTS = {
+    "rbi_rate_delta":  0.0,   # bps change from base (positive = RBI hike)
+    "fed_rate_delta":  0.0,
+    "ecb_rate_delta":  0.0,
+    "boe_rate_delta":  0.0,
+    "snb_rate_delta":  0.0,
+    "oil_price_delta": 0.0,   # $ change from base ~$72
+    "risk_sentiment":  0.0,   # −3 extreme risk-off … +3 extreme risk-on
+    "fpi_flow_delta":  0.0,   # $bn/month net FPI change from base
+}
+
+
+def whatif_forecast(pair: str, params: dict, horizon: int,
+                    spot: float, n_sim: int = 10_000, seed: int = 7) -> dict:
+    """
+    Re-run Monte Carlo with scenario-adjusted drift and vol.
+
+    params: dict of factor overrides (keys from WHATIF_DEFAULTS).
+            Rate deltas are in basis-point units (e.g. 25 = +25bps).
+    Returns same shape as monte_carlo_probability() plus fan-chart paths.
+    """
+    base_mu    = _BASE[pair]["mu"]
+    base_sigma = _BASE[pair]["sigma"]
+    sens       = _SENSITIVITY.get(pair, {})
+
+    # Convert bps → decimal for rate factors
+    delta_mu = 0.0
+    for factor, coeff in sens.items():
+        raw = params.get(factor, 0.0)
+        if "rate" in factor:
+            raw = raw / 100.0   # bps → pct points → already annual
+        delta_mu += raw * coeff
+
+    adj_mu    = base_mu + delta_mu
+    rs        = params.get("risk_sentiment", 0.0)
+    vol_mult  = _VOL_MULTIPLIER.get(pair, lambda x: 1.0)(rs)
+    adj_sigma = base_sigma * vol_mult
+
+    rng   = np.random.default_rng(seed)
+    dt    = 1 / 252
+    shocks = rng.standard_normal((n_sim, horizon))
+    log_r  = (adj_mu - 0.5 * adj_sigma**2) * dt + adj_sigma * np.sqrt(dt) * shocks
+    paths  = spot * np.exp(log_r.cumsum(axis=1))
+    end_px = paths[:, -1]
+
+    prob_up = float((end_px > spot).mean())
+    q5, q25, q50, q75, q95 = np.percentile(end_px, [5, 25, 50, 75, 95])
+
+    # Fan chart: percentile bands across time (5 / 25 / 50 / 75 / 95)
+    fan = {
+        "p5":  [round(float(v), 4) for v in np.percentile(paths, 5,  axis=0)],
+        "p25": [round(float(v), 4) for v in np.percentile(paths, 25, axis=0)],
+        "p50": [round(float(v), 4) for v in np.percentile(paths, 50, axis=0)],
+        "p75": [round(float(v), 4) for v in np.percentile(paths, 75, axis=0)],
+        "p95": [round(float(v), 4) for v in np.percentile(paths, 95, axis=0)],
+    }
+
+    return {
+        "pair":          pair,
+        "horizon":       horizon,
+        "spot":          round(spot, 4),
+        "adj_drift_pct": round(adj_mu * 100, 3),
+        "adj_vol_pct":   round(adj_sigma * 100, 3),
+        "prob_up_pct":   round(prob_up * 100, 1),
+        "prob_dn_pct":   round((1 - prob_up) * 100, 1),
+        "p5":   round(q5,  4),
+        "p25":  round(q25, 4),
+        "p50":  round(q50, 4),
+        "p75":  round(q75, 4),
+        "p95":  round(q95, 4),
+        "fan":  fan,
+    }
+
+
+# ─────────────────────────────────────────────────────────
 # SECTION 5 – CAPITAL FLOW ANALYSIS
 # ─────────────────────────────────────────────────────────
 
