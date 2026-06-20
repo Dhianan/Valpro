@@ -35,20 +35,28 @@ async function get(url) {
 /* ── Live FX rates via Frankfurter (ECB) ──────────────── */
 async function fetchLiveRates() {
   try {
+    // Use EUR as base (Frankfurter's native currency — most reliable)
+    // EUR → USD, INR, CHF, GBP in one call
     const r = await fetch(
-      "https://api.frankfurter.app/latest?from=USD&to=INR,CHF,EUR,GBP",
-      { signal: AbortSignal.timeout(6000) }
+      "https://api.frankfurter.app/latest?from=EUR&to=USD,INR,CHF,GBP",
+      { signal: AbortSignal.timeout(8000) }
     );
     if (!r.ok) return null;
-    const d = await r.json();
-    const rates = d.rates;
+    const d     = await r.json();
+    const rates = d.rates;  // { USD: x, INR: x, CHF: x, GBP: x }
+
+    // Validate all required fields are present numbers
+    if (!rates.USD || !rates.INR || !rates.CHF || !rates.GBP) return null;
+
+    // Derive the four pairs from EUR-based crosses
     liveRates = {
-      "USD/INR": parseFloat(rates.INR.toFixed(4)),
-      "CHF/INR": parseFloat((rates.INR / rates.CHF).toFixed(4)),
-      "EUR/USD": parseFloat((1 / rates.EUR).toFixed(4)),
-      "GBP/USD": parseFloat((1 / rates.GBP).toFixed(4)),
+      "EUR/USD": parseFloat(rates.USD.toFixed(4)),                  // EUR/USD = rates.USD
+      "GBP/USD": parseFloat((rates.USD / rates.GBP).toFixed(4)),   // GBP/USD = USD÷GBP (per EUR)
+      "USD/INR": parseFloat((rates.INR / rates.USD).toFixed(4)),   // USD/INR = INR÷USD (per EUR)
+      "CHF/INR": parseFloat((rates.INR / rates.CHF).toFixed(4)),   // CHF/INR = INR÷CHF (per EUR)
       timestamp: d.date,
     };
+
     // Show live badge + note
     const badge = document.getElementById("live-rates-badge");
     const note  = document.getElementById("live-rates-note");
@@ -56,6 +64,7 @@ async function fetchLiveRates() {
     if (badge) badge.style.display = "block";
     if (note)  note.style.display  = "block";
     if (ts)    ts.textContent = liveRates.timestamp;
+
     return liveRates;
   } catch {
     return null;  // silently fall back to model spot
@@ -1060,14 +1069,13 @@ function initWhatIf() {
 
 /* ── Boot ────────────────────────────────────────────────── */
 async function boot() {
-  // pre-fetch model data + live rates in parallel
+  // Fetch model data and live rates in parallel — all three must resolve
+  // before rendering so KPI cards always get real spot prices when available
   [macroData, forecastData] = await Promise.all([
     get("/api/macro"),
     get("/api/forecast"),
+    fetchLiveRates(),   // awaited in parallel; null if network unavailable
   ]);
-
-  // attempt live rates (non-blocking — falls back to model spot silently)
-  fetchLiveRates();   // fire and forget; loadOverview re-reads liveRates
 
   await loadOverview();
 
