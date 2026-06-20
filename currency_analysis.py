@@ -382,6 +382,323 @@ def whatif_forecast(pair: str, params: dict, horizon: int,
 
 
 # ─────────────────────────────────────────────────────────
+# SECTION 4c – INVESTOPEDIA INDICATOR FRAMEWORK
+#
+# Source: "What Economic Indicators Are Most Used When
+#          Forecasting Exchange Rates?" – Investopedia
+#
+# Four forecasting models:
+#   1. Purchasing Power Parity (PPP)
+#   2. Relative Economic Strength
+#   3. Interest Rate Parity (UIP / CIP)
+#   4. Econometric composite
+#
+# Seven primary indicators scored per pair:
+#   1. Inflation differential       (PPP channel)
+#   2. Interest rate differential   (UIP channel)
+#   3. Current account / BoP        (trade flow channel)
+#   4. GDP growth differential      (economic strength)
+#   5. Public debt burden           (fiscal sustainability)
+#   6. Terms of trade               (commodity / export competitiveness)
+#   7. Political stability & risk   (risk-premium channel)
+# ─────────────────────────────────────────────────────────
+
+# ── Economy-level data extended for indicator engine ────
+_ECON = {
+    "INR": {
+        "cpi":              4.20,
+        "policy_rate":      5.50,
+        "real_rate":        1.30,
+        "gdp_growth":       6.80,
+        "ca_gdp":          -1.80,
+        "debt_gdp":        83.00,
+        "tot_index":        98.5,   # Terms of Trade index (100 = balanced); India commodity importer
+        "pol_stability":     5.0,   # 0–10; 10 = most stable
+        "fx_reserves_bn":  680.0,
+        "spot_vs_ppp":     -18.0,   # INR undervalued vs PPP by ~18% (Big Mac / World Bank est.)
+    },
+    "CHF": {
+        "cpi":              0.80,
+        "policy_rate":      0.25,
+        "real_rate":       -0.55,
+        "gdp_growth":       1.40,
+        "ca_gdp":           8.50,
+        "debt_gdp":        27.00,
+        "tot_index":       105.2,
+        "pol_stability":    9.5,
+        "fx_reserves_bn":  850.0,
+        "spot_vs_ppp":     +22.0,   # CHF overvalued vs PPP (historically overvalued safe-haven)
+    },
+    "USD": {
+        "cpi":              2.60,
+        "policy_rate":      4.25,
+        "real_rate":        1.65,
+        "gdp_growth":       2.10,
+        "ca_gdp":          -3.20,
+        "debt_gdp":       124.00,
+        "tot_index":       101.5,
+        "pol_stability":    7.0,
+        "fx_reserves_bn":  245.0,
+        "spot_vs_ppp":      +5.0,   # USD mildly overvalued vs broad PPP basket
+    },
+    "EUR": {
+        "cpi":              2.30,
+        "policy_rate":      2.50,
+        "real_rate":        0.20,
+        "gdp_growth":       0.90,
+        "ca_gdp":           2.10,
+        "debt_gdp":        88.00,
+        "tot_index":       100.8,
+        "pol_stability":    7.5,
+        "fx_reserves_bn":  900.0,
+        "spot_vs_ppp":      -3.0,
+    },
+    "GBP": {
+        "cpi":              3.40,
+        "policy_rate":      4.75,
+        "real_rate":        1.35,
+        "gdp_growth":       1.10,
+        "ca_gdp":          -3.50,
+        "debt_gdp":        99.00,
+        "tot_index":        99.2,
+        "pol_stability":    7.8,
+        "fx_reserves_bn":  180.0,
+        "spot_vs_ppp":      -7.0,
+    },
+}
+
+# Pair → (base currency, quote currency)
+_PAIR_CCYS = {
+    "CHF/INR": ("CHF", "INR"),
+    "USD/INR": ("USD", "INR"),
+    "EUR/USD": ("EUR", "USD"),
+    "GBP/USD": ("GBP", "USD"),
+}
+
+
+def _signal(value: float, bull_thresh: float, bear_thresh: float,
+            higher_is_bull: bool = True) -> str:
+    """Convert a numeric value to BULLISH / BEARISH / NEUTRAL for the base currency."""
+    if higher_is_bull:
+        if value >= bull_thresh:  return "BULLISH"
+        if value <= bear_thresh:  return "BEARISH"
+    else:
+        if value <= bull_thresh:  return "BULLISH"
+        if value >= bear_thresh:  return "BEARISH"
+    return "NEUTRAL"
+
+
+def compute_indicator_scorecard(pair: str) -> dict:
+    """
+    Score all seven Investopedia indicators for a currency pair.
+    Positive signals favour the BASE currency (numerator).
+
+    Returns a dict with per-indicator readings and an overall composite score.
+    """
+    if pair not in _PAIR_CCYS:
+        raise ValueError(f"Unknown pair: {pair}")
+
+    base_ccy, quote_ccy = _PAIR_CCYS[pair]
+    B = _ECON[base_ccy]
+    Q = _ECON[quote_ccy]
+
+    indicators = {}
+
+    # ── 1. PPP / Inflation Differential ─────────────────────
+    # Higher inflation in BASE → base depreciates → BEARISH for pair
+    infl_diff = B["cpi"] - Q["cpi"]           # positive = base inflating faster
+    ppp_misval = B["spot_vs_ppp"] - Q["spot_vs_ppp"]  # positive = base overvalued
+    infl_sig   = _signal(infl_diff, -0.5, 0.5, higher_is_bull=False)
+    ppp_sig    = _signal(ppp_misval, -5.0, 5.0, higher_is_bull=False)
+    indicators["PPP / Inflation Differential"] = {
+        "model":       "Purchasing Power Parity",
+        "value":       round(infl_diff, 2),
+        "unit":        "ppt (base − quote CPI)",
+        "ppp_misval":  round(ppp_misval, 1),
+        "signal":      infl_sig,
+        "ppp_signal":  ppp_sig,
+        "reading": (
+            f"Base {base_ccy} CPI {B['cpi']}% vs {quote_ccy} {Q['cpi']}% → "
+            f"differential {infl_diff:+.2f}ppt. "
+            f"PPP misvaluation: {base_ccy} {'overvalued' if ppp_misval > 0 else 'undervalued'} "
+            f"by {abs(ppp_misval):.1f}%."
+        ),
+        "source": "Investopedia: PPP model — inflation differentials predict exchange rate "
+                  "movement; higher relative inflation depreciates the currency.",
+    }
+
+    # ── 2. Interest Rate Differential (UIP) ─────────────────
+    # Higher real rate in BASE → capital inflows → BULLISH for pair
+    rate_diff      = B["real_rate"] - Q["real_rate"]
+    nominal_spread = B["policy_rate"] - Q["policy_rate"]
+    rate_sig       = _signal(rate_diff, 0.3, -0.3, higher_is_bull=True)
+    indicators["Interest Rate Differential (UIP)"] = {
+        "model":          "Interest Rate Parity",
+        "real_rate_diff": round(rate_diff, 2),
+        "nominal_spread": round(nominal_spread, 2),
+        "unit":           "ppt (base − quote real rate)",
+        "signal":         rate_sig,
+        "reading": (
+            f"Real rate {base_ccy} {B['real_rate']}% vs {quote_ccy} {Q['real_rate']}% → "
+            f"differential {rate_diff:+.2f}ppt. "
+            f"Nominal spread {nominal_spread:+.2f}ppt."
+        ),
+        "source": "Investopedia: UIP — higher real interest rates attract foreign capital, "
+                  "increasing demand for the currency.",
+    }
+
+    # ── 3. Current Account / Balance of Payments ─────────────
+    # BASE current account surplus → net FX inflows → BULLISH
+    ca_diff = B["ca_gdp"] - Q["ca_gdp"]
+    ca_sig  = _signal(ca_diff, 1.0, -1.0, higher_is_bull=True)
+    indicators["Current Account / Balance of Payments"] = {
+        "model":   "Balance of Payments",
+        "value":   round(ca_diff, 2),
+        "unit":    "ppt of GDP (base CA − quote CA)",
+        "base_ca": B["ca_gdp"],
+        "quote_ca": Q["ca_gdp"],
+        "signal":  ca_sig,
+        "reading": (
+            f"{base_ccy} CA {B['ca_gdp']:+.1f}% GDP vs {quote_ccy} {Q['ca_gdp']:+.1f}% → "
+            f"differential {ca_diff:+.2f}ppt. "
+            f"{'Surplus supports ' + base_ccy if B['ca_gdp'] > 0 else 'Deficit pressures ' + base_ccy}."
+        ),
+        "source": "Investopedia: BoP model — persistent current account surpluses generate "
+                  "net demand for the domestic currency.",
+    }
+
+    # ── 4. GDP Growth Differential (Economic Strength) ───────
+    # Higher growth in BASE → capital attraction → BULLISH
+    gdp_diff = B["gdp_growth"] - Q["gdp_growth"]
+    gdp_sig  = _signal(gdp_diff, 0.5, -0.5, higher_is_bull=True)
+    indicators["GDP Growth Differential"] = {
+        "model":      "Relative Economic Strength",
+        "value":      round(gdp_diff, 2),
+        "unit":       "ppt (base − quote GDP growth)",
+        "base_gdp":   B["gdp_growth"],
+        "quote_gdp":  Q["gdp_growth"],
+        "signal":     gdp_sig,
+        "reading": (
+            f"{base_ccy} GDP {B['gdp_growth']}% vs {quote_ccy} {Q['gdp_growth']}% → "
+            f"differential {gdp_diff:+.2f}ppt. "
+            f"Stronger growth attracts investment flows."
+        ),
+        "source": "Investopedia: Relative Economic Strength — investors seek high-growth "
+                  "economies, bidding up the currency.",
+    }
+
+    # ── 5. Public Debt Burden ────────────────────────────────
+    # Lower debt/GDP in BASE → lower inflation/default risk → BULLISH
+    debt_diff = B["debt_gdp"] - Q["debt_gdp"]    # negative = base has less debt (good)
+    debt_sig  = _signal(debt_diff, -10.0, 10.0, higher_is_bull=False)
+    indicators["Public Debt Burden"] = {
+        "model":       "Fiscal Sustainability",
+        "value":       round(debt_diff, 1),
+        "unit":        "ppt (base debt/GDP − quote debt/GDP)",
+        "base_debt":   B["debt_gdp"],
+        "quote_debt":  Q["debt_gdp"],
+        "signal":      debt_sig,
+        "reading": (
+            f"{base_ccy} debt/GDP {B['debt_gdp']}% vs {quote_ccy} {Q['debt_gdp']}% → "
+            f"differential {debt_diff:+.1f}ppt. "
+            f"{'Higher debt pressures ' + base_ccy if debt_diff > 0 else base_ccy + ' has fiscal advantage'}."
+        ),
+        "source": "Investopedia: High public debt can crowd out private investment and "
+                  "signal future monetisation risk, depressing the currency.",
+    }
+
+    # ── 6. Terms of Trade ────────────────────────────────────
+    # Higher ToT index in BASE → export competitiveness → BULLISH
+    tot_diff = B["tot_index"] - Q["tot_index"]
+    tot_sig  = _signal(tot_diff, 2.0, -2.0, higher_is_bull=True)
+    indicators["Terms of Trade"] = {
+        "model":      "Trade Competitiveness",
+        "value":      round(tot_diff, 2),
+        "unit":       "index points (base ToT − quote ToT)",
+        "base_tot":   B["tot_index"],
+        "quote_tot":  Q["tot_index"],
+        "signal":     tot_sig,
+        "reading": (
+            f"{base_ccy} ToT index {B['tot_index']} vs {quote_ccy} {Q['tot_index']} → "
+            f"differential {tot_diff:+.2f}. "
+            f"{'Improving ToT supports ' + base_ccy if tot_diff > 0 else 'Deteriorating ToT pressures ' + base_ccy}."
+        ),
+        "source": "Investopedia: A favourable terms of trade (export prices rising relative "
+                  "to import prices) increases currency demand.",
+    }
+
+    # ── 7. Political Stability ───────────────────────────────
+    # Higher stability score in BASE → lower risk premium → BULLISH
+    pol_diff = B["pol_stability"] - Q["pol_stability"]
+    pol_sig  = _signal(pol_diff, 0.5, -0.5, higher_is_bull=True)
+    indicators["Political Stability"] = {
+        "model":       "Risk Premium",
+        "value":       round(pol_diff, 1),
+        "unit":        "score points (base − quote, 0–10 scale)",
+        "base_score":  B["pol_stability"],
+        "quote_score": Q["pol_stability"],
+        "signal":      pol_sig,
+        "reading": (
+            f"{base_ccy} stability {B['pol_stability']}/10 vs {quote_ccy} {Q['pol_stability']}/10 → "
+            f"differential {pol_diff:+.1f}. "
+            f"{'Lower risk premium supports ' + base_ccy if pol_diff > 0 else quote_ccy + ' offers safer haven'}."
+        ),
+        "source": "Investopedia: Politically stable countries attract more foreign investment; "
+                  "uncertainty adds a risk premium that weakens the currency.",
+    }
+
+    # ── Composite Score ──────────────────────────────────────
+    # Convert signals to +1 / 0 / -1 and weight by model importance
+    weights = {
+        "PPP / Inflation Differential":          0.18,
+        "Interest Rate Differential (UIP)":      0.22,
+        "Current Account / Balance of Payments": 0.18,
+        "GDP Growth Differential":               0.17,
+        "Public Debt Burden":                    0.10,
+        "Terms of Trade":                        0.08,
+        "Political Stability":                   0.07,
+    }
+    sig_map  = {"BULLISH": 1, "NEUTRAL": 0, "BEARISH": -1}
+    raw_score = sum(
+        sig_map[ind["signal"]] * weights[name]
+        for name, ind in indicators.items()
+    )
+    # Normalise to 0–100 scale (50 = neutral)
+    composite = round(50 + raw_score * 50, 1)
+    if composite >= 60:
+        composite_signal = "BULLISH"
+    elif composite <= 40:
+        composite_signal = "BEARISH"
+    else:
+        composite_signal = "NEUTRAL"
+
+    # PPP fair-value estimate for the pair
+    ppp_implied_change_pct = -infl_diff   # per annum; negative because higher base infl → depreciation
+    ppp_fair_description   = (
+        f"Based on inflation differentials, {base_ccy} should "
+        f"{'depreciate' if ppp_implied_change_pct < 0 else 'appreciate'} "
+        f"~{abs(ppp_implied_change_pct):.1f}%/yr vs {quote_ccy} under relative PPP."
+    )
+
+    return {
+        "pair":              pair,
+        "base_ccy":          base_ccy,
+        "quote_ccy":         quote_ccy,
+        "indicators":        indicators,
+        "composite_score":   composite,
+        "composite_signal":  composite_signal,
+        "ppp_fair_value":    ppp_fair_description,
+        "model_weights":     weights,
+        "reference":         "Investopedia – What Economic Indicators Are Most Used When "
+                             "Forecasting Exchange Rates?",
+    }
+
+
+def scorecard_all_pairs() -> dict:
+    return {pair: compute_indicator_scorecard(pair) for pair in _PAIR_CCYS}
+
+
+# ─────────────────────────────────────────────────────────
 # SECTION 5 – CAPITAL FLOW ANALYSIS
 # ─────────────────────────────────────────────────────────
 

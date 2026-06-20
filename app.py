@@ -7,6 +7,7 @@ from currency_analysis import (
     monte_carlo_probability,
     rate_differential_adjustment,
     whatif_forecast,
+    scorecard_all_pairs,
     WHATIF_DEFAULTS,
     MACRO_DATA,
     RATE_DIFFERENTIALS,
@@ -145,6 +146,11 @@ def api_whatif():
         "scenario": scenario,
         "params":   params,
     })
+
+
+@app.route("/api/indicators")
+def api_indicators():
+    return jsonify(scorecard_all_pairs())
 
 
 @app.route("/api/whatif/defaults")

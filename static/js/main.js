@@ -511,6 +511,170 @@ async function loadForecast(pair) {
     <span style="color:var(--green)">${p.p95}</span>`;
 }
 
+/* ── SECTION: Indicators ────────────────────────────────── */
+
+let indicatorData = null;
+
+const IND_LABELS = [
+  "PPP / Inflation",
+  "Interest Rate (UIP)",
+  "Current Account",
+  "GDP Growth",
+  "Public Debt",
+  "Terms of Trade",
+  "Political Stability",
+];
+const IND_KEYS = [
+  "PPP / Inflation Differential",
+  "Interest Rate Differential (UIP)",
+  "Current Account / Balance of Payments",
+  "GDP Growth Differential",
+  "Public Debt Burden",
+  "Terms of Trade",
+  "Political Stability",
+];
+const MODEL_COLOR = {
+  "Purchasing Power Parity":       "#bc8cff",
+  "Interest Rate Parity":          "#58a6ff",
+  "Balance of Payments":           "#3fb950",
+  "Relative Economic Strength":    "#d29922",
+  "Fiscal Sustainability":         "#f85149",
+  "Trade Competitiveness":         "#39d353",
+  "Risk Premium":                  "#8b949e",
+};
+
+function sigColor(sig) {
+  return sig === "BULLISH" ? "var(--green)" : sig === "BEARISH" ? "var(--red)" : "var(--yellow)";
+}
+function sigBadge(sig) {
+  const cls = sig === "BULLISH" ? "badge-green" : sig === "BEARISH" ? "badge-red" : "badge-yellow";
+  return `<span class="badge ${cls}">${sig}</span>`;
+}
+
+async function loadIndicators(pair) {
+  document.getElementById("ind-loading").style.display = "flex";
+  document.getElementById("ind-content").style.display = "none";
+
+  if (!indicatorData) {
+    indicatorData = await get("/api/indicators");
+  }
+  const sc = indicatorData[pair];
+
+  // Composite score bar
+  const compEl = document.getElementById("ind-composite");
+  const score  = sc.composite_score;
+  const sig    = sc.composite_signal;
+  const col    = sigColor(sig);
+  compEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:12px">
+      <div class="stat">
+        <div class="value" style="color:${col};font-size:2.4rem">${score}</div>
+        <div class="label">Composite Score</div>
+      </div>
+      <div>
+        ${sigBadge(sig)}
+        <div style="font-size:.75rem;color:var(--muted);margin-top:6px">
+          ${sc.base_ccy} vs ${sc.quote_ccy} · weighted across 7 indicators
+        </div>
+      </div>
+    </div>
+    <div style="position:relative;height:12px;border-radius:6px;
+                background:linear-gradient(to right,var(--red),var(--yellow) 50%,var(--green));
+                margin-top:8px">
+      <div style="position:absolute;top:-4px;left:${score}%;transform:translateX(-50%);
+                  width:20px;height:20px;background:white;border-radius:50%;
+                  border:2px solid ${col};box-shadow:0 0 6px ${col}44"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.68rem;
+                color:var(--muted);margin-top:6px">
+      <span>0 · Max Bearish</span><span>50 · Neutral</span><span>100 · Max Bullish</span>
+    </div>
+  `;
+
+  // Radar chart
+  const sigToScore = s => s === "BULLISH" ? 3 : s === "NEUTRAL" ? 2 : 1;
+  const radarData  = IND_KEYS.map(k => sigToScore(sc.indicators[k]?.signal || "NEUTRAL"));
+  if (charts["ind-radar"]) charts["ind-radar"].destroy();
+  charts["ind-radar"] = new Chart(document.getElementById("ind-radar"), {
+    type: "radar",
+    data: {
+      labels: IND_LABELS,
+      datasets: [{
+        label: pair,
+        data: radarData,
+        borderColor: "#58a6ff",
+        backgroundColor: "rgba(88,166,255,0.15)",
+        borderWidth: 2,
+        pointBackgroundColor: radarData.map(v =>
+          v === 3 ? "#3fb950" : v === 1 ? "#f85149" : "#d29922"),
+        pointRadius: 5,
+      }],
+    },
+    options: {
+      animation: false,
+      scales: {
+        r: {
+          min: 0, max: 3,
+          ticks: { display: false },
+          grid:  { color: "rgba(48,54,61,.8)" },
+          pointLabels: { color: "#8b949e", font: { size: 10 } },
+          angleLines: { color: "rgba(48,54,61,.8)" },
+        },
+      },
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ["Bearish","","Neutral","","Bullish"][ctx.raw - 1] || "" }
+      }},
+    },
+  });
+
+  // PPP fair value
+  document.getElementById("ind-ppp").textContent = sc.ppp_fair_value;
+
+  // Per-indicator table
+  const rows = IND_KEYS.map(name => {
+    const ind = sc.indicators[name];
+    const modelCol = MODEL_COLOR[ind.model] || "var(--muted)";
+    return `
+      <tr>
+        <td><strong>${name}</strong></td>
+        <td><span style="color:${modelCol};font-size:.7rem;font-weight:600">${ind.model}</span></td>
+        <td class="num">${ind.value !== undefined ? (ind.value > 0 ? "+" : "") + ind.value : "—"}</td>
+        <td style="color:var(--muted);font-size:.72rem">${ind.unit}</td>
+        <td>${sigBadge(ind.signal)}</td>
+        <td style="color:var(--muted);font-size:.72rem;max-width:320px">${ind.reading}</td>
+      </tr>`;
+  }).join("");
+
+  document.getElementById("ind-table").innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Indicator</th><th>Model</th><th>Value</th>
+        <th>Unit</th><th>Signal</th><th>Reading</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  // Model weights
+  document.getElementById("ind-weights").innerHTML = Object.entries(sc.model_weights)
+    .map(([name, w]) => {
+      const shortName = name.split(" ").slice(0, 3).join(" ");
+      return `<div class="card" style="padding:10px 14px;min-width:140px">
+        <div style="font-size:.7rem;color:var(--muted)">${shortName}</div>
+        <div style="font-size:1rem;font-weight:700;color:var(--accent)">${(w * 100).toFixed(0)}%</div>
+      </div>`;
+    }).join("");
+
+  document.getElementById("ind-loading").style.display = "none";
+  document.getElementById("ind-content").style.display = "block";
+}
+
+function initIndicators() {
+  setupPairTabs("#ind-pair-tabs",
+    ["CHF/INR", "USD/INR", "EUR/USD", "GBP/USD"],
+    loadIndicators);
+  loadIndicators("USD/INR");
+}
+
 /* ── SECTION: What If ───────────────────────────────────── */
 
 const WI_RATE_FACTORS = {
@@ -879,6 +1043,9 @@ async function boot() {
 
   // What If section (lazy init when tab clicked)
   document.querySelector("[data-section='whatif']")?.addEventListener("click", initWhatIf, { once: true });
+
+  // Indicators section (lazy init when tab clicked)
+  document.querySelector("[data-section='indicators']")?.addEventListener("click", initIndicators, { once: true });
 }
 
 document.addEventListener("DOMContentLoaded", boot);

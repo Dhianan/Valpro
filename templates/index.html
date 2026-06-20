@@ -36,6 +36,7 @@
   <button data-section="technical">Technical Analysis</button>
   <button data-section="forecast">Forecasts</button>
   <button data-section="whatif">What If</button>
+  <button data-section="indicators">Indicators</button>
 </nav>
 
 <!-- ── Main ────────────────────────────────────────────── -->
@@ -238,6 +239,54 @@
   </section>
 
 </main>
+
+  <!-- ── INDICATORS ──────────────────────────────────────── -->
+  <section id="indicators">
+    <div class="section-title">Investopedia Indicator Framework</div>
+    <p style="color:var(--muted);font-size:.8rem;margin-bottom:6px">
+      Seven economic indicators scored per pair across four forecasting models:
+      <strong>PPP</strong> · <strong>Interest Rate Parity (UIP)</strong> ·
+      <strong>Relative Economic Strength</strong> · <strong>Balance of Payments</strong>.
+    </p>
+    <p style="color:var(--muted);font-size:.72rem;margin-bottom:20px">
+      Source: <em>Investopedia — "What Economic Indicators Are Most Used When Forecasting Exchange Rates?"</em>
+    </p>
+
+    <div class="pair-tabs" id="ind-pair-tabs"></div>
+    <div class="loading" id="ind-loading"><div class="spinner"></div>Loading…</div>
+    <div id="ind-content" style="display:none">
+
+      <!-- Composite score + radar -->
+      <div class="grid" style="grid-template-columns:1fr 320px;gap:16px;margin-bottom:20px">
+        <div class="card">
+          <div class="card-title">Composite Score (0 = max bearish · 100 = max bullish)</div>
+          <div id="ind-composite"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Indicator Radar</div>
+          <canvas id="ind-radar" width="300" height="280"></canvas>
+        </div>
+      </div>
+
+      <!-- PPP fair value callout -->
+      <div class="card" style="margin-bottom:16px;border-left:3px solid var(--accent)">
+        <div class="card-title">PPP Fair Value Assessment</div>
+        <div id="ind-ppp" style="font-size:.82rem"></div>
+      </div>
+
+      <!-- Per-indicator table -->
+      <div class="card">
+        <div class="card-title">Per-Indicator Breakdown</div>
+        <div class="table-wrap" id="ind-table"></div>
+      </div>
+
+      <!-- Model weights -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">Model Weights Used in Composite</div>
+        <div id="ind-weights" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px"></div>
+      </div>
+    </div>
+  </section>
 
   <!-- ── WHAT IF ──────────────────────────────────────── -->
   <section id="whatif">
