@@ -138,18 +138,19 @@ function renderPriceChart(pair, series, canvasId) {
   const col = PAIR_COLORS[pair] || PAIR_COLORS["EUR/USD"];
   const histLen = series.history.dates.length;
   const allDates = [...series.history.dates, ...series.forecast.dates];
-  const allClose = [
-    ...series.history.close,
-    ...series.forecast.close,
-  ];
-  const sma20 = [
-    ...series.history.sma20,
-    ...series.forecast.sma20,
-  ];
-  const sma50 = [
-    ...series.history.sma50,
-    ...series.forecast.sma50,
-  ];
+
+  // If live rates are available, rescale the entire price series so the last
+  // historical close matches the live rate. This keeps the chart shape (all
+  // relative moves) while anchoring the price level to current market reality.
+  const liveSpot   = liveRates?.[pair];
+  const modelClose = series.history.close[series.history.close.length - 1];
+  const scale      = (liveSpot && modelClose) ? liveSpot / modelClose : 1;
+
+  const rescale = arr => arr.map(v => v != null ? parseFloat((v * scale).toFixed(4)) : null);
+
+  const allClose = rescale([...series.history.close, ...series.forecast.close]);
+  const sma20    = rescale([...series.history.sma20,  ...series.forecast.sma20]);
+  const sma50    = rescale([...series.history.sma50,  ...series.forecast.sma50]);
 
   // Forecast boundary line (vertical) – use background color change via segment
   makeChart(canvasId, "line", {
@@ -305,12 +306,17 @@ function renderProbBars(pair, probData, containerId) {
   const down = probData.prob_dn_pct;
   const bias = up >= 50 ? "BULLISH" : "BEARISH";
   const biasClass = up >= 50 ? "badge-green" : "badge-red";
+  const spot   = liveRates?.[pair] ?? probData.current_spot;
+  const isLive = !!(liveRates?.[pair]);
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <span class="badge ${biasClass}">${bias}</span>
       <span style="font-size:.75rem;color:var(--muted)">
-        Spot: <strong style="color:var(--text)">${probData.current_spot}</strong>
+        Spot: <strong style="color:var(--text)">${spot}</strong>
+        ${isLive
+          ? `<span class="live-badge" style="margin-left:4px;font-size:.55rem"><span class="live-dot"></span>LIVE</span>`
+          : `<span style="margin-left:4px;font-size:.6rem;color:var(--muted)">(MODEL)</span>`}
       </span>
     </div>
     <div class="prob-container">
@@ -389,14 +395,18 @@ async function loadOverview() {
   ];
   const kpiWrap = document.getElementById("kpi-cards");
   kpiWrap.innerHTML = pairs.map(({ pair, horizon, glowColor }) => {
-    const p       = fcast[pair];
-    const spot    = liveRates?.[pair] ?? p.current_spot;
+    const raw     = fcast[pair];
+    const spot    = liveRates?.[pair] ?? raw.current_spot;
     const isLive  = !!(liveRates?.[pair]);
-    const bias    = p.prob_up_pct >= 50 ? "BULLISH" : "BEARISH";
-    const bclass  = p.prob_up_pct >= 50 ? "badge-green" : "badge-red";
-    const arrow   = p.prob_up_pct >= 50 ? "↑" : "↓";
-    const pct     = p.prob_up_pct >= 50 ? p.prob_up_pct : p.prob_dn_pct;
-    const p50     = p.p50;
+    // Rescale forecast percentiles to live spot so P50 / P5 / P95 are consistent
+    const sc      = (isLive && raw.current_spot) ? spot / raw.current_spot : 1;
+    const p50     = parseFloat((raw.p50 * sc).toFixed(4));
+    const p5      = parseFloat((raw.p5  * sc).toFixed(4));
+    const p95     = parseFloat((raw.p95 * sc).toFixed(4));
+    const bias    = raw.prob_up_pct >= 50 ? "BULLISH" : "BEARISH";
+    const bclass  = raw.prob_up_pct >= 50 ? "badge-green" : "badge-red";
+    const arrow   = raw.prob_up_pct >= 50 ? "↑" : "↓";
+    const pct     = raw.prob_up_pct >= 50 ? raw.prob_up_pct : raw.prob_dn_pct;
     const delta   = (((p50 - spot) / spot) * 100).toFixed(2);
     const dcolor  = delta >= 0 ? "var(--green)" : "var(--red)";
     return `
@@ -416,7 +426,7 @@ async function loadOverview() {
         </div>
         <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between">
           <span class="badge ${bclass}">${arrow} ${bias} ${pct}%</span>
-          <span style="font-size:.68rem;color:var(--muted)">${p.p5} – ${p.p95}</span>
+          <span style="font-size:.68rem;color:var(--muted)">${p5} – ${p95}</span>
         </div>
       </div>`;
   }).join("");
@@ -512,12 +522,19 @@ async function loadTechnical(pair) {
   const rsiVal = series.latest.rsi;
   const rsiZone = rsiVal > 70 ? "Overbought" : rsiVal < 30 ? "Oversold" : "Neutral";
   const rsiColor = rsiVal > 70 ? "var(--red)" : rsiVal < 30 ? "var(--green)" : "var(--yellow)";
+  const techSpot   = liveRates?.[pair] ?? series.latest.close;
+  const techIsLive = !!(liveRates?.[pair]);
 
   stEl.innerHTML = `
     <div class="card" style="display:flex;gap:32px;flex-wrap:wrap;align-items:center">
       <div class="stat">
-        <div class="value">${series.latest.close}</div>
-        <div class="label">${pair} Last Close</div>
+        <div class="value" style="display:flex;align-items:center;gap:8px">
+          ${techSpot}
+          ${techIsLive
+            ? `<span class="live-badge" style="font-size:.58rem"><span class="live-dot"></span>LIVE</span>`
+            : `<span style="font-size:.58rem;color:var(--muted)">MODEL</span>`}
+        </div>
+        <div class="label">${pair} Spot</div>
       </div>
       <div class="stat">
         <div class="value" style="font-size:1.2rem;color:var(--accent)">${series.latest.sma20}</div>
@@ -556,9 +573,25 @@ async function loadForecast(pair) {
   const fcast = forecastData || await get("/api/forecast");
   forecastData = fcast;
 
-  const p      = fcast[pair];
   const series = seriesCache[pair] || await get(`/api/series/${pair.replace("/", "-")}`);
   seriesCache[pair] = series;
+
+  // Rescale Monte Carlo percentiles to the live rate when available.
+  // The GBM history is a simulated path; the model spot may differ from the
+  // current market rate. Rescaling keeps relative fan-chart proportions intact
+  // while anchoring all levels to the actual live spot.
+  const raw      = fcast[pair];
+  const liveSpot = liveRates?.[pair];
+  const pScale   = (liveSpot && raw.current_spot) ? liveSpot / raw.current_spot : 1;
+  const p = pScale === 1 ? raw : {
+    ...raw,
+    current_spot: liveSpot,
+    p5:  parseFloat((raw.p5  * pScale).toFixed(4)),
+    p25: parseFloat((raw.p25 * pScale).toFixed(4)),
+    p50: parseFloat((raw.p50 * pScale).toFixed(4)),
+    p75: parseFloat((raw.p75 * pScale).toFixed(4)),
+    p95: parseFloat((raw.p95 * pScale).toFixed(4)),
+  };
 
   renderPriceChart(pair, series, "fcast-price-chart");
   renderRSIChart(pair, series, "fcast-rsi-chart");
@@ -832,7 +865,12 @@ async function runWhatIf() {
   const res = await fetch("/api/whatif", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pair: wiPair, horizon: wiHorizon, params: wiParams }),
+    body: JSON.stringify({
+      pair:          wiPair,
+      horizon:       wiHorizon,
+      params:        wiParams,
+      spot_override: liveRates?.[wiPair] ?? null,   // send live rate so Monte Carlo starts from actual spot
+    }),
   });
   const d = await res.json();
   document.getElementById("wi-loading").style.display = "none";
@@ -937,6 +975,8 @@ function renderWiKpi(d) {
   const probDelta = (scenario.prob_up_pct - base.prob_up_pct).toFixed(1);
   const p50Delta  = (scenario.p50 - base.p50).toFixed(4);
   const p50DeltaPct = (((scenario.p50 - base.p50) / base.p50) * 100).toFixed(2);
+  const liveSpot  = liveRates?.[d.pair];
+  const isLive    = !!liveSpot;
 
   const pill = (v, suffix = "") => {
     const cls = v > 0 ? "delta-pos" : v < 0 ? "delta-neg" : "delta-neu";
@@ -944,6 +984,16 @@ function renderWiKpi(d) {
   };
 
   el.innerHTML = `
+    <div class="card stat">
+      <div class="card-title">Starting Spot</div>
+      <div class="value" style="display:flex;align-items:center;gap:8px">
+        ${isLive ? liveSpot : base.spot}
+        ${isLive
+          ? `<span class="live-badge" style="font-size:.58rem"><span class="live-dot"></span>LIVE</span>`
+          : `<span style="font-size:.58rem;color:var(--muted)">MODEL</span>`}
+      </div>
+      <div class="sub">${isLive ? `Model was ${base.spot}` : "Live rate unavailable"}</div>
+    </div>
     <div class="card stat">
       <div class="card-title">Bullish Probability</div>
       <div class="value">${scenario.prob_up_pct}%</div>

@@ -125,7 +125,9 @@ def api_whatif():
 
     df   = _datasets[pair]
     hist = df[df["Period"] == "History"]
-    spot = float(hist["Close"].iloc[-1])
+    # Accept a live-rate override from the client (browser fetches live rates; server cannot)
+    spot_override = body.get("spot_override")
+    spot = float(spot_override) if spot_override else float(hist["Close"].iloc[-1])
 
     # Base case (zero deltas) for comparison
     base = whatif_forecast(pair, WHATIF_DEFAULTS, horizon, spot, seed=7)

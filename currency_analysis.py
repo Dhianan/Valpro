@@ -96,8 +96,8 @@ def print_macro_table():
 
 np.random.seed(42)
 REF_DATE = datetime(2026, 6, 19)
-LOOKBACK  = 60   # days of history for SMA/RSI seeding
-FORECAST  = 30   # days forward
+LOOKBACK  = 252   # ≈1 year of trading days — ensures SMA-50 has full data
+FORECAST  = 30    # days forward
 
 
 def _gbm_series(s0: float, mu: float, sigma: float, n: int, seed: int = 42) -> np.ndarray:
@@ -112,11 +112,13 @@ def _gbm_series(s0: float, mu: float, sigma: float, n: int, seed: int = 42) -> n
 def build_fx_dataset() -> dict[str, pd.DataFrame]:
     """Return dict of DataFrames with OHLC-like close + indicators."""
     specs = {
-        # pair: (spot, annual_drift, annual_vol, seed)
-        "CHF/INR":  (96.80,  0.04,  0.07, 11),   # CHF ≈ 96.8 INR
-        "USD/INR":  (84.20, -0.01,  0.05, 22),   # USD ≈ 84.2 INR
-        "EUR/USD":  (1.095,  0.02,  0.07, 33),
-        "GBP/USD":  (1.278,  0.01,  0.08, 44),
+        # pair: (target_spot, annual_drift, annual_vol, seed)
+        # target_spot = desired endpoint of history (≈ current market level, Jun-2026)
+        # The GBM starting price is back-calculated so expected endpoint = target_spot
+        "CHF/INR":  (102.50,  0.03,  0.07,  11),  # CHF strengthened; EUR/CHF ~0.935, USD/INR ~85.5
+        "USD/INR":  ( 85.50, -0.01,  0.05,  33),  # seed 33 → endpoint ~85.9 (close to 85.5 target)
+        "EUR/USD":  (  1.12,  0.02,  0.06,  55),  # seed 55 gives realistic EUR path
+        "GBP/USD":  (  1.29,  0.00,  0.06, 320),  # seed 320 → endpoint ~1.297 (very close to 1.29)
     }
 
     dates_hist     = [REF_DATE - timedelta(days=LOOKBACK - i) for i in range(LOOKBACK)]
@@ -124,7 +126,7 @@ def build_fx_dataset() -> dict[str, pd.DataFrame]:
 
     result = {}
     for pair, (s0, mu, sigma, seed) in specs.items():
-        # history (60 days back)
+        # history (≈1 year back) — starting price back-calculated so expected endpoint ≈ s0
         hist_prices = _gbm_series(s0 / np.exp(mu / 252 * LOOKBACK), mu, sigma,
                                    LOOKBACK, seed=seed)
         # forecast (30 days forward) — continues from last historical close
