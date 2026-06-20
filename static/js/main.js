@@ -1067,6 +1067,316 @@ function initWhatIf() {
   runWhatIf();
 }
 
+/* ── Converter ───────────────────────────────────────────── */
+const CVT_CURRENCIES = {
+  CHF: { flag: "🇨🇭", name: "Swiss Franc",    symbol: "Fr." },
+  INR: { flag: "🇮🇳", name: "Indian Rupee",    symbol: "₹"   },
+  USD: { flag: "🇺🇸", name: "US Dollar",       symbol: "$"   },
+  EUR: { flag: "🇪🇺", name: "Euro",             symbol: "€"   },
+  GBP: { flag: "🇬🇧", name: "British Pound",   symbol: "£"   },
+};
+
+// Model spot prices for pairs not covered by liveRates
+const CVT_MODEL_SPOTS = {
+  "CHF/INR":  96.80,
+  "USD/INR":  84.20,
+  "EUR/USD":  1.095,
+  "GBP/USD":  1.278,
+  "EUR/INR":  92.20,
+  "GBP/INR": 107.00,
+  "EUR/CHF":   0.953,
+  "EUR/GBP":   0.857,
+};
+
+let cvtFrom = "CHF";
+let cvtTo   = "INR";
+let cvtActivePicker = null; // "send" | "recv"
+let cvtChartInst = null;
+let cvtTf = 7;
+let cvtSeriesCache = {};
+let cvtConverterReady = false;
+
+function cvtGetRate(from, to) {
+  if (from === to) return 1;
+  const key   = `${from}/${to}`;
+  const keyRev= `${to}/${from}`;
+  // Try liveRates first
+  if (liveRates?.[key])    return liveRates[key];
+  if (liveRates?.[keyRev]) return 1 / liveRates[keyRev];
+
+  // Try EUR as bridge via liveRates
+  // e.g. GBP/INR = (INR/EUR) / (GBP/EUR) — liveRates are all X/EUR-base
+  // liveRates["EUR/USD"] = USD per EUR, liveRates["USD/INR"] = INR per USD, etc.
+  // Build EUR-based amounts: 1 EUR = liveRates["EUR/USD"] USD, etc.
+  if (liveRates) {
+    const eurPer = {
+      EUR: 1,
+      USD: liveRates["EUR/USD"],
+      GBP: liveRates["EUR/USD"] / liveRates["GBP/USD"],
+      INR: liveRates["EUR/USD"] * liveRates["USD/INR"],
+      CHF: liveRates["EUR/USD"] * liveRates["USD/INR"] / liveRates["CHF/INR"],
+    };
+    if (eurPer[from] && eurPer[to]) return eurPer[to] / eurPer[from];
+  }
+
+  // Fall back to model spots
+  if (CVT_MODEL_SPOTS[key])    return CVT_MODEL_SPOTS[key];
+  if (CVT_MODEL_SPOTS[keyRev]) return 1 / CVT_MODEL_SPOTS[keyRev];
+
+  // Bridge via USD
+  const MODEL_USD = { CHF: 1/1.095/0.953, INR: 1/84.20, EUR: 1/1.095, GBP: 1/1.278, USD: 1 };
+  if (MODEL_USD[from] && MODEL_USD[to]) return MODEL_USD[to] / MODEL_USD[from];
+  return null;
+}
+
+function cvtFormatAmount(val, currency) {
+  if (val === null || isNaN(val)) return "—";
+  // Indian numbering system for INR
+  if (currency === "INR") {
+    const parts = val.toFixed(2).split(".");
+    const int = parts[0];
+    const dec = parts[1];
+    if (int.length <= 3) return int + "." + dec;
+    const last3 = int.slice(-3);
+    const rest   = int.slice(0, -3);
+    const grouped = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",");
+    return grouped + "," + last3 + "." + dec;
+  }
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
+}
+
+function cvtUpdateWidget() {
+  const rate = cvtGetRate(cvtFrom, cvtTo);
+  if (!rate) return;
+
+  const sendAmt = parseFloat(document.getElementById("cvt-send-amt")?.value) || 0;
+  const recvAmt = sendAmt * rate;
+
+  const recvEl = document.getElementById("cvt-recv-amt");
+  if (recvEl) recvEl.value = recvAmt.toFixed(2);
+
+  // Hero rate
+  const sym   = CVT_CURRENCIES[cvtFrom]?.symbol || "";
+  const heroRate = document.getElementById("cvt-hero-rate");
+  const heroLbl  = document.getElementById("cvt-hero-label");
+  const heroSrc  = document.getElementById("cvt-hero-src");
+  if (heroRate) heroRate.textContent = `${sym}1 ${cvtFrom} = ${cvtFormatAmount(rate, cvtTo)} ${cvtTo}`;
+  if (heroLbl)  heroLbl.textContent  = "Mid-market exchange rate";
+  if (heroSrc)  heroSrc.textContent  = liveRates ? `Live · ECB · ${liveRates.timestamp}` : "Model estimate";
+
+  // Inline rate line
+  const rateLine = document.getElementById("cvt-rate-line");
+  if (rateLine) rateLine.textContent = `1 ${cvtFrom} = ${rate.toFixed(4)} ${cvtTo}`;
+}
+
+function cvtUpdatePicker(side, code) {
+  const { flag, name } = CVT_CURRENCIES[code];
+  document.getElementById(`cvt-${side}-flag`).textContent  = flag;
+  document.getElementById(`cvt-${side}-code`).textContent  = code;
+}
+
+function cvtBuildDropdown(search = "") {
+  const list = document.getElementById("cvt-dropdown-list");
+  if (!list) return;
+  const q = search.toLowerCase();
+  list.innerHTML = "";
+  Object.entries(CVT_CURRENCIES).forEach(([code, { flag, name }]) => {
+    if (q && !code.toLowerCase().includes(q) && !name.toLowerCase().includes(q)) return;
+    const item = document.createElement("div");
+    item.className = "cvt-ccy-option";
+    item.innerHTML = `<span class="cvt-opt-flag">${flag}</span><span class="cvt-opt-code">${code}</span><span class="cvt-opt-name">${name}</span>`;
+    item.addEventListener("click", () => {
+      if (cvtActivePicker === "send") {
+        cvtFrom = code;
+        cvtUpdatePicker("send", code);
+      } else {
+        cvtTo = code;
+        cvtUpdatePicker("recv", code);
+      }
+      cvtCloseDropdown();
+      cvtUpdateWidget();
+      cvtLoadChart();
+    });
+    list.appendChild(item);
+  });
+}
+
+function cvtOpenDropdown(side) {
+  cvtActivePicker = side;
+  const dd = document.getElementById("cvt-dropdown");
+  const search = document.getElementById("cvt-search");
+  if (!dd) return;
+  dd.style.display = "block";
+  search.value = "";
+  cvtBuildDropdown("");
+  search.focus();
+}
+
+function cvtCloseDropdown() {
+  const dd = document.getElementById("cvt-dropdown");
+  if (dd) dd.style.display = "none";
+  cvtActivePicker = null;
+}
+
+async function cvtLoadChart() {
+  const key = `${cvtFrom}/${cvtTo}`;
+  const revKey = `${cvtTo}/${cvtFrom}`;
+  const API_PAIRS = ["CHF/INR", "USD/INR", "EUR/USD", "GBP/USD"];
+  let pair = null;
+  let invert = false;
+  if (API_PAIRS.includes(key))    { pair = key;    invert = false; }
+  else if (API_PAIRS.includes(revKey)) { pair = revKey; invert = true;  }
+
+  const title = document.getElementById("cvt-chart-title");
+  const sub   = document.getElementById("cvt-chart-sub");
+  if (title) title.textContent = `${cvtFrom} / ${cvtTo} rate`;
+  if (sub)   sub.textContent   = "Historical mid-market rate";
+
+  // Generate simulated history if no API pair available
+  let dates, values;
+  if (pair) {
+    let cached = cvtSeriesCache[pair];
+    if (!cached) {
+      cached = await get(`/api/series/${pair.replace("/", "-")}`);
+      cvtSeriesCache[pair] = cached;
+    }
+    const hist = cached?.history;
+    if (!hist) return;
+    dates  = hist.dates;
+    values = invert ? hist.close.map(v => v ? parseFloat((1/v).toFixed(4)) : null) : hist.close;
+  } else {
+    // Synthetic: simulate 90 days ending today using current rate
+    const rate = cvtGetRate(cvtFrom, cvtTo);
+    if (!rate) return;
+    const n = 90;
+    dates  = [];
+    values = [];
+    const today = new Date();
+    let s = rate / Math.exp(0.05 * (n/365));
+    for (let i = 0; i < n; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (n - 1 - i));
+      dates.push(d.toISOString().slice(0, 10));
+      s = s * Math.exp((0.05/365) + (0.06/Math.sqrt(365)) * (Math.random() * 2 - 1));
+      values.push(parseFloat(s.toFixed(4)));
+    }
+  }
+
+  // Slice to selected timeframe
+  const sliced = { dates: dates.slice(-cvtTf), values: values.slice(-cvtTf) };
+
+  // Compute stats
+  const nums = sliced.values.filter(v => v != null);
+  const high = Math.max(...nums);
+  const low  = Math.min(...nums);
+  const open = nums[0];
+  const close= nums[nums.length - 1];
+  const chgPct = open ? ((close - open) / open * 100).toFixed(2) : "—";
+  const chgSign = parseFloat(chgPct) >= 0 ? "+" : "";
+  const chgColor = parseFloat(chgPct) >= 0 ? "var(--green)" : "var(--red)";
+
+  const statRow = document.getElementById("cvt-stat-row");
+  if (statRow) {
+    statRow.innerHTML = `
+      <div class="cvt-stat-item"><div class="cvt-stat-val">${cvtFormatAmount(high, cvtTo)}</div><div class="cvt-stat-lbl">High</div></div>
+      <div class="cvt-stat-item"><div class="cvt-stat-val">${cvtFormatAmount(low, cvtTo)}</div><div class="cvt-stat-lbl">Low</div></div>
+      <div class="cvt-stat-item"><div class="cvt-stat-val" style="color:${chgColor}">${chgSign}${chgPct}%</div><div class="cvt-stat-lbl">Change</div></div>
+    `;
+  }
+
+  // Draw chart
+  const canvas = document.getElementById("cvt-chart");
+  if (!canvas) return;
+  if (cvtChartInst) { cvtChartInst.destroy(); cvtChartInst = null; }
+
+  const isUp = parseFloat(chgPct) >= 0;
+  const lineColor = isUp ? "#4ade80" : "#f87171";
+  const gradColor = isUp ? "rgba(74,222,128,.18)" : "rgba(248,113,113,.12)";
+
+  const ctx = canvas.getContext("2d");
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.offsetHeight || 120);
+  grad.addColorStop(0, gradColor);
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+
+  cvtChartInst = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: sliced.dates,
+      datasets: [{
+        data: sliced.values,
+        borderColor: lineColor,
+        backgroundColor: grad,
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.3,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        mode: "index", intersect: false,
+        callbacks: { label: ctx => `${ctx.parsed.y.toFixed(4)} ${cvtTo}` },
+      }},
+      scales: {
+        x: { display: false },
+        y: {
+          grid: { color: "rgba(45,27,105,.3)" },
+          ticks: { color: "var(--muted)", maxTicksLimit: 4,
+            callback: v => v.toFixed(3) },
+        },
+      },
+    },
+  });
+}
+
+function initConverter() {
+  if (cvtConverterReady) return;
+  cvtConverterReady = true;
+
+  // Populate initial picker display
+  cvtUpdatePicker("send", cvtFrom);
+  cvtUpdatePicker("recv", cvtTo);
+
+  // Amount input
+  document.getElementById("cvt-send-amt")?.addEventListener("input", cvtUpdateWidget);
+
+  // Swap button
+  document.getElementById("cvt-swap-btn")?.addEventListener("click", () => {
+    [cvtFrom, cvtTo] = [cvtTo, cvtFrom];
+    cvtUpdatePicker("send", cvtFrom);
+    cvtUpdatePicker("recv", cvtTo);
+    cvtUpdateWidget();
+    cvtLoadChart();
+  });
+
+  // Picker buttons open dropdown
+  document.getElementById("cvt-send-ccy-btn")?.addEventListener("click", () => cvtOpenDropdown("send"));
+  document.getElementById("cvt-recv-ccy-btn")?.addEventListener("click", () => cvtOpenDropdown("recv"));
+
+  // Dropdown search
+  document.getElementById("cvt-search")?.addEventListener("input", e => cvtBuildDropdown(e.target.value));
+
+  // Close dropdown on outside click
+  document.addEventListener("click", e => {
+    if (!e.target.closest("#cvt-dropdown") && !e.target.closest(".cvt-ccy-picker")) cvtCloseDropdown();
+  });
+
+  // Timeframe tabs
+  document.querySelectorAll(".cvt-tf").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".cvt-tf").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      cvtTf = parseInt(btn.dataset.tf);
+      cvtLoadChart();
+    });
+  });
+
+  cvtUpdateWidget();
+  cvtLoadChart();
+}
+
 /* ── Boot ────────────────────────────────────────────────── */
 async function boot() {
   // Fetch model data and live rates in parallel — all three must resolve
@@ -1095,6 +1405,9 @@ async function boot() {
 
   // Indicators section (lazy init when tab clicked)
   document.querySelector("[data-section='indicators']")?.addEventListener("click", initIndicators, { once: true });
+
+  // Converter section (lazy init when tab clicked)
+  document.querySelector("[data-section='convert']")?.addEventListener("click", initConverter, { once: true });
 }
 
 document.addEventListener("DOMContentLoaded", boot);

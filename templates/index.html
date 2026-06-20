@@ -42,6 +42,7 @@
 <!-- ── Navigation ──────────────────────────────────────── -->
 <nav>
   <button class="active" data-section="overview">Overview</button>
+  <button data-section="convert">Converter</button>
   <button data-section="macro">Macro Factors</button>
   <button data-section="technical">Technical Analysis</button>
   <button data-section="forecast">Forecasts</button>
@@ -51,6 +52,85 @@
 
 <!-- ── Main ────────────────────────────────────────────── -->
 <main>
+
+  <!-- ── CONVERTER ────────────────────────────────────── -->
+  <section id="convert">
+
+    <div class="cvt-wrap">
+
+      <!-- ── Rate hero ───────────────────────────────────── -->
+      <div class="cvt-hero">
+        <div class="cvt-hero-rate" id="cvt-hero-rate">—</div>
+        <div class="cvt-hero-label" id="cvt-hero-label">Loading rate…</div>
+        <div class="cvt-hero-source" id="cvt-hero-src"></div>
+      </div>
+
+      <!-- ── Converter widget ─────────────────────────────── -->
+      <div class="cvt-widget">
+
+        <!-- You send -->
+        <div class="cvt-field-label">You send</div>
+        <div class="cvt-field">
+          <input class="cvt-input" id="cvt-send-amt" type="number" value="1000" min="0" step="any" />
+          <div class="cvt-ccy-picker" id="cvt-send-ccy-btn">
+            <span class="cvt-flag" id="cvt-send-flag">🇨🇭</span>
+            <span class="cvt-ccy-code" id="cvt-send-code">CHF</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+        </div>
+
+        <!-- Swap button -->
+        <div class="cvt-swap-row">
+          <div class="cvt-rate-line" id="cvt-rate-line">1 CHF = — INR</div>
+          <button class="cvt-swap-btn" id="cvt-swap-btn" title="Swap currencies">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Recipient gets -->
+        <div class="cvt-field-label">Recipient gets</div>
+        <div class="cvt-field">
+          <input class="cvt-input cvt-input-result" id="cvt-recv-amt" type="number" readonly />
+          <div class="cvt-ccy-picker" id="cvt-recv-ccy-btn">
+            <span class="cvt-flag" id="cvt-recv-flag">🇮🇳</span>
+            <span class="cvt-ccy-code" id="cvt-recv-code">INR</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+        </div>
+
+        <!-- Disclaimer -->
+        <p class="cvt-disclaimer">
+          Mid-market rate · ECB reference data via Frankfurter · Indicative only · Not a transaction rate
+        </p>
+      </div>
+
+      <!-- ── Currency dropdown (shared) ──────────────────── -->
+      <div class="cvt-dropdown" id="cvt-dropdown" style="display:none">
+        <input class="cvt-search" id="cvt-search" type="text" placeholder="Search currency…" />
+        <div class="cvt-dropdown-list" id="cvt-dropdown-list"></div>
+      </div>
+
+      <!-- ── Rate chart ────────────────────────────────────── -->
+      <div class="cvt-chart-card">
+        <div class="cvt-chart-header">
+          <div>
+            <div class="cvt-chart-title" id="cvt-chart-title">CHF / INR rate</div>
+            <div class="cvt-chart-sub" id="cvt-chart-sub">Historical mid-market rate</div>
+          </div>
+          <div class="cvt-tf-tabs" id="cvt-tf-tabs">
+            <button class="cvt-tf active" data-tf="7">1W</button>
+            <button class="cvt-tf" data-tf="30">1M</button>
+            <button class="cvt-tf" data-tf="90">3M</button>
+          </div>
+        </div>
+        <canvas id="cvt-chart" height="80"></canvas>
+        <div class="cvt-stat-row" id="cvt-stat-row"></div>
+      </div>
+
+    </div>
+  </section>
 
   <!-- ── OVERVIEW ─────────────────────────────────────── -->
   <section id="overview" class="active">
