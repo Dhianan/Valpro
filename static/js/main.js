@@ -32,43 +32,64 @@ async function get(url) {
   return r.json();
 }
 
-/* ── Live FX rates via Frankfurter (ECB) ──────────────── */
+/* ── Live FX rates — multi-source with fallback ───────────
+   All sources are free, key-less, CORS-enabled and EUR-based.
+   We try each in order until one returns the four crosses we need.
+   The single-source build silently failed whenever frankfurter.app
+   was unreachable, leaving every card on the stale MODEL baseline. */
+const RATE_SOURCES = [
+  {
+    name: "Frankfurter (ECB)",
+    url:  "https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD,INR,CHF,GBP",
+    parse: d => ({ rates: d.rates, date: d.date }),
+  },
+  {
+    name: "Frankfurter (ECB)",
+    url:  "https://api.frankfurter.app/latest?from=EUR&to=USD,INR,CHF,GBP",
+    parse: d => ({ rates: d.rates, date: d.date }),
+  },
+  {
+    name: "ExchangeRate-API",
+    url:  "https://open.er-api.com/v6/latest/EUR",
+    parse: d => ({
+      rates: d.rates,
+      date:  (d.time_last_update_utc || "").slice(5, 16) || new Date().toISOString().slice(0, 10),
+    }),
+  },
+];
+
 async function fetchLiveRates() {
-  try {
-    // Use EUR as base (Frankfurter's native currency — most reliable)
-    // EUR → USD, INR, CHF, GBP in one call
-    const r = await fetch(
-      "https://api.frankfurter.app/latest?from=EUR&to=USD,INR,CHF,GBP",
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (!r.ok) return null;
-    const d     = await r.json();
-    const rates = d.rates;  // { USD: x, INR: x, CHF: x, GBP: x }
+  for (const src of RATE_SOURCES) {
+    try {
+      const r = await fetch(src.url, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) continue;
+      const { rates, date } = src.parse(await r.json());
+      if (!rates || !rates.USD || !rates.INR || !rates.CHF || !rates.GBP) continue;
 
-    // Validate all required fields are present numbers
-    if (!rates.USD || !rates.INR || !rates.CHF || !rates.GBP) return null;
+      // All sources are EUR-based → derive the four crosses consistently
+      liveRates = {
+        "EUR/USD": parseFloat(rates.USD.toFixed(4)),                 // USD per EUR
+        "GBP/USD": parseFloat((rates.USD / rates.GBP).toFixed(4)),   // USD÷GBP
+        "USD/INR": parseFloat((rates.INR / rates.USD).toFixed(4)),   // INR÷USD
+        "CHF/INR": parseFloat((rates.INR / rates.CHF).toFixed(4)),   // INR÷CHF
+        timestamp: date,
+        source:    src.name,
+      };
 
-    // Derive the four pairs from EUR-based crosses
-    liveRates = {
-      "EUR/USD": parseFloat(rates.USD.toFixed(4)),                  // EUR/USD = rates.USD
-      "GBP/USD": parseFloat((rates.USD / rates.GBP).toFixed(4)),   // GBP/USD = USD÷GBP (per EUR)
-      "USD/INR": parseFloat((rates.INR / rates.USD).toFixed(4)),   // USD/INR = INR÷USD (per EUR)
-      "CHF/INR": parseFloat((rates.INR / rates.CHF).toFixed(4)),   // CHF/INR = INR÷CHF (per EUR)
-      timestamp: d.date,
-    };
+      // Show live badge + note
+      const badge = document.getElementById("live-rates-badge");
+      const note  = document.getElementById("live-rates-note");
+      const ts    = document.getElementById("rates-timestamp");
+      if (badge) badge.style.display = "block";
+      if (note)  note.style.display  = "block";
+      if (ts)    ts.textContent = `${liveRates.timestamp} · ${src.name}`;
 
-    // Show live badge + note
-    const badge = document.getElementById("live-rates-badge");
-    const note  = document.getElementById("live-rates-note");
-    const ts    = document.getElementById("rates-timestamp");
-    if (badge) badge.style.display = "block";
-    if (note)  note.style.display  = "block";
-    if (ts)    ts.textContent = liveRates.timestamp;
-
-    return liveRates;
-  } catch {
-    return null;  // silently fall back to model spot
+      return liveRates;
+    } catch {
+      // try next source
+    }
   }
+  return null;  // all sources failed → fall back to model spot
 }
 
 /* ── Nav ─────────────────────────────────────────────── */
@@ -1076,16 +1097,18 @@ const CVT_CURRENCIES = {
   GBP: { flag: "🇬🇧", name: "British Pound",   symbol: "£"   },
 };
 
-// Model spot prices for pairs not covered by liveRates
+// Model spot prices — last-resort fallback only (when every live feed
+// is unreachable). Kept internally cross-consistent off USD/INR≈86.4,
+// EUR/USD≈1.12, CHF/USD≈1.20, GBP/USD≈1.27 so derived crosses agree.
 const CVT_MODEL_SPOTS = {
-  "CHF/INR":  96.80,
-  "USD/INR":  84.20,
-  "EUR/USD":  1.095,
-  "GBP/USD":  1.278,
-  "EUR/INR":  92.20,
-  "GBP/INR": 107.00,
-  "EUR/CHF":   0.953,
-  "EUR/GBP":   0.857,
+  "USD/INR":  86.40,
+  "EUR/USD":   1.120,
+  "GBP/USD":   1.270,
+  "CHF/INR": 103.70,   // 1.20 × 86.40
+  "EUR/INR":  96.77,   // 1.12 × 86.40
+  "GBP/INR": 109.73,   // 1.27 × 86.40
+  "EUR/CHF":   0.933,  // 1.12 / 1.20
+  "EUR/GBP":   0.882,  // 1.12 / 1.27
 };
 
 let cvtFrom = "CHF";
@@ -1123,9 +1146,15 @@ function cvtGetRate(from, to) {
   if (CVT_MODEL_SPOTS[key])    return CVT_MODEL_SPOTS[key];
   if (CVT_MODEL_SPOTS[keyRev]) return 1 / CVT_MODEL_SPOTS[keyRev];
 
-  // Bridge via USD
-  const MODEL_USD = { CHF: 1/1.095/0.953, INR: 1/84.20, EUR: 1/1.095, GBP: 1/1.278, USD: 1 };
-  if (MODEL_USD[from] && MODEL_USD[to]) return MODEL_USD[to] / MODEL_USD[from];
+  // Bridge via USD using model spots (value of 1 unit in USD)
+  const usdValue = {
+    USD: 1,
+    EUR: CVT_MODEL_SPOTS["EUR/USD"],                              // 1.120
+    GBP: CVT_MODEL_SPOTS["GBP/USD"],                              // 1.270
+    CHF: CVT_MODEL_SPOTS["EUR/USD"] / CVT_MODEL_SPOTS["EUR/CHF"], // 1.200
+    INR: 1 / CVT_MODEL_SPOTS["USD/INR"],                          // 1/86.40
+  };
+  if (usdValue[from] && usdValue[to]) return usdValue[from] / usdValue[to];
   return null;
 }
 
@@ -1162,7 +1191,9 @@ function cvtUpdateWidget() {
   const heroSrc  = document.getElementById("cvt-hero-src");
   if (heroRate) heroRate.textContent = `${sym}1 ${cvtFrom} = ${cvtFormatAmount(rate, cvtTo)} ${cvtTo}`;
   if (heroLbl)  heroLbl.textContent  = "Mid-market exchange rate";
-  if (heroSrc)  heroSrc.textContent  = liveRates ? `Live · ECB · ${liveRates.timestamp}` : "Model estimate";
+  if (heroSrc)  heroSrc.textContent  = liveRates
+    ? `Live · ${liveRates.source || "ECB"} · ${liveRates.timestamp}`
+    : "Model estimate (live feed unavailable)";
 
   // Inline rate line
   const rateLine = document.getElementById("cvt-rate-line");
@@ -1260,6 +1291,15 @@ async function cvtLoadChart() {
       s = s * Math.exp((0.05/365) + (0.06/Math.sqrt(365)) * (Math.random() * 2 - 1));
       values.push(parseFloat(s.toFixed(4)));
     }
+  }
+
+  // Anchor the simulated history to the current live rate so the chart's
+  // endpoint matches the rate shown above (no jump between chart & hero).
+  const liveRate = cvtGetRate(cvtFrom, cvtTo);
+  const lastVal  = [...values].reverse().find(v => v != null);
+  if (liveRate && lastVal) {
+    const scale = liveRate / lastVal;
+    values = values.map(v => v != null ? parseFloat((v * scale).toFixed(4)) : null);
   }
 
   // Slice to selected timeframe
