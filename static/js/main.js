@@ -1,21 +1,21 @@
 /* ── Globals ─────────────────────────────────────────── */
 const PAIR_COLORS = {
-  "CHF/INR": { price: "#a78bfa", sma20: "#60a5fa", sma50: "#f87171", rsi: "#fbbf24" },
-  "USD/INR": { price: "#4ade80", sma20: "#60a5fa", sma50: "#f87171", rsi: "#fbbf24" },
-  "EUR/USD": { price: "#818cf8", sma20: "#a78bfa", sma50: "#f87171", rsi: "#fbbf24" },
-  "GBP/USD": { price: "#34d399", sma20: "#60a5fa", sma50: "#f87171", rsi: "#fbbf24" },
+  "CHF/INR": { price: "#4F46E5", sma20: "#0EA5E9", sma50: "#F59E0B", rsi: "#8B5CF6" },
+  "USD/INR": { price: "#10B981", sma20: "#0EA5E9", sma50: "#F59E0B", rsi: "#8B5CF6" },
+  "EUR/USD": { price: "#6366F1", sma20: "#0EA5E9", sma50: "#F59E0B", rsi: "#8B5CF6" },
+  "GBP/USD": { price: "#0EA5E9", sma20: "#6366F1", sma50: "#F59E0B", rsi: "#8B5CF6" },
 };
 const CHART_DEFAULTS = {
   animation: false,
   plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
   scales: {
     x: {
-      ticks: { color: "#8b7ec8", font: { size: 10 }, maxRotation: 0, maxTicksLimit: 8 },
-      grid:  { color: "rgba(45,27,105,.4)" },
+      ticks: { color: "#94A3B8", font: { size: 10 }, maxRotation: 0, maxTicksLimit: 8 },
+      grid:  { color: "rgba(226,232,240,.8)" },
     },
     y: {
-      ticks: { color: "#8b7ec8", font: { size: 10 } },
-      grid:  { color: "rgba(45,27,105,.4)" },
+      ticks: { color: "#94A3B8", font: { size: 10 } },
+      grid:  { color: "rgba(226,232,240,.8)" },
     },
   },
 };
@@ -207,13 +207,13 @@ function renderPriceChart(pair, series, canvasId) {
             type: "line",
             xMin: allDates[histLen],
             xMax: allDates[histLen],
-            borderColor: "#8b949e",
+            borderColor: "#64748B",
             borderWidth: 1,
             borderDash: [4, 4],
             label: {
               display: true,
               content: "Forecast →",
-              color: "#8b949e",
+              color: "#64748B",
               font: { size: 10 },
               position: "start",
             },
@@ -225,7 +225,7 @@ function renderPriceChart(pair, series, canvasId) {
       ...CHART_DEFAULTS.scales,
       y: {
         ...CHART_DEFAULTS.scales.y,
-        title: { display: true, text: pair, color: "#8b949e", font: { size: 11 } },
+        title: { display: true, text: pair, color: "#64748B", font: { size: 11 } },
       },
     },
   });
@@ -388,10 +388,10 @@ async function loadOverview() {
 
   // KPI cards — violet-bloom style with live-rate overlay
   const pairs = [
-    { pair: "CHF/INR", horizon: "30d", glowColor: "#a78bfa" },
-    { pair: "USD/INR", horizon: "30d", glowColor: "#4ade80" },
-    { pair: "EUR/USD", horizon: "7d",  glowColor: "#818cf8" },
-    { pair: "GBP/USD", horizon: "7d",  glowColor: "#34d399" },
+    { pair: "CHF/INR", horizon: "30d", glowColor: "#4F46E5" },
+    { pair: "USD/INR", horizon: "30d", glowColor: "#10B981" },
+    { pair: "EUR/USD", horizon: "7d",  glowColor: "#6366F1" },
+    { pair: "GBP/USD", horizon: "7d",  glowColor: "#0EA5E9" },
   ];
   const kpiWrap = document.getElementById("kpi-cards");
   kpiWrap.innerHTML = pairs.map(({ pair, horizon, glowColor }) => {
@@ -497,7 +497,7 @@ async function loadMacro() {
       <div class="card">
         <div class="card-title" style="color:${col}">${theme}</div>
         <ul style="list-style:none">
-          ${pts.map(p => `<li style="font-size:.75rem;color:var(--muted);padding:4px 0 4px 14px;position:relative;border-bottom:1px solid rgba(48,54,61,.5)">
+          ${pts.map(p => `<li style="font-size:.75rem;color:var(--muted);padding:4px 0 4px 14px;position:relative;border-bottom:1px solid rgba(226,232,240,.8)">
             <span style="position:absolute;left:0;color:${col};font-size:.65rem">▸</span>${p}
           </li>`).join("")}
         </ul>
@@ -635,13 +635,13 @@ const IND_KEYS = [
   "Political Stability",
 ];
 const MODEL_COLOR = {
-  "Purchasing Power Parity":       "#bc8cff",
-  "Interest Rate Parity":          "#58a6ff",
-  "Balance of Payments":           "#3fb950",
-  "Relative Economic Strength":    "#d29922",
-  "Fiscal Sustainability":         "#f85149",
-  "Trade Competitiveness":         "#39d353",
-  "Risk Premium":                  "#8b949e",
+  "Purchasing Power Parity":       "#6366F1",
+  "Interest Rate Parity":          "#0EA5E9",
+  "Balance of Payments":           "#10B981",
+  "Relative Economic Strength":    "#F59E0B",
+  "Fiscal Sustainability":         "#EF4444",
+  "Trade Competitiveness":         "#14B8A6",
+  "Risk Premium":                  "#64748B",
 };
 
 function sigColor(sig) {
@@ -703,11 +703,11 @@ async function loadIndicators(pair) {
       datasets: [{
         label: pair,
         data: radarData,
-        borderColor: "#58a6ff",
-        backgroundColor: "rgba(88,166,255,0.15)",
+        borderColor: "#4F46E5",
+        backgroundColor: "rgba(79,70,229,0.10)",
         borderWidth: 2,
         pointBackgroundColor: radarData.map(v =>
-          v === 3 ? "#3fb950" : v === 1 ? "#f85149" : "#d29922"),
+          v === 3 ? "#10B981" : v === 1 ? "#EF4444" : "#F59E0B"),
         pointRadius: 5,
       }],
     },
@@ -717,9 +717,9 @@ async function loadIndicators(pair) {
         r: {
           min: 0, max: 3,
           ticks: { display: false },
-          grid:  { color: "rgba(48,54,61,.8)" },
-          pointLabels: { color: "#8b949e", font: { size: 10 } },
-          angleLines: { color: "rgba(48,54,61,.8)" },
+          grid:  { color: "rgba(226,232,240,.9)" },
+          pointLabels: { color: "#64748B", font: { size: 10 } },
+          angleLines: { color: "rgba(226,232,240,.9)" },
         },
       },
       plugins: { legend: { display: false }, tooltip: {
@@ -896,7 +896,7 @@ function renderWiFanChart(d) {
           label: "Scenario P75",
           data: scenario.fan.p75,
           borderColor: "transparent",
-          backgroundColor: "rgba(248,81,73,0.12)",
+          backgroundColor: "rgba(239,68,68,0.08)",
           fill: "+1",
           pointRadius: 0,
           tension: 0.3,
@@ -905,7 +905,7 @@ function renderWiFanChart(d) {
           label: "Scenario P25",
           data: scenario.fan.p25,
           borderColor: "transparent",
-          backgroundColor: "rgba(248,81,73,0.12)",
+          backgroundColor: "rgba(239,68,68,0.08)",
           fill: false,
           pointRadius: 0,
           tension: 0.3,
@@ -915,7 +915,7 @@ function renderWiFanChart(d) {
           label: "Base P75",
           data: base.fan.p75,
           borderColor: "transparent",
-          backgroundColor: "rgba(88,166,255,0.08)",
+          backgroundColor: "rgba(79,70,229,0.05)",
           fill: "+1",
           pointRadius: 0,
           tension: 0.3,
@@ -924,7 +924,7 @@ function renderWiFanChart(d) {
           label: "Base P25",
           data: base.fan.p25,
           borderColor: "transparent",
-          backgroundColor: "rgba(88,166,255,0.08)",
+          backgroundColor: "rgba(79,70,229,0.05)",
           fill: false,
           pointRadius: 0,
           tension: 0.3,
@@ -933,7 +933,7 @@ function renderWiFanChart(d) {
         {
           label: "Base P50",
           data: base.fan.p50,
-          borderColor: "#8b949e",
+          borderColor: "#64748B",
           borderWidth: 2,
           borderDash: [5, 3],
           pointRadius: 0,
@@ -944,7 +944,7 @@ function renderWiFanChart(d) {
         {
           label: "Scenario P50",
           data: scenario.fan.p50,
-          borderColor: "#f85149",
+          borderColor: "#EF4444",
           borderWidth: 2.5,
           pointRadius: 0,
           tension: 0.3,
@@ -963,7 +963,7 @@ function renderWiFanChart(d) {
       scales: {
         ...CHART_DEFAULTS.scales,
         y: { ...CHART_DEFAULTS.scales.y,
-          title: { display: true, text: d.pair, color: "#8b949e", font: { size: 11 } } },
+          title: { display: true, text: d.pair, color: "#64748B", font: { size: 11 } } },
       },
     },
   });
@@ -1380,13 +1380,13 @@ async function cvtLoadChart() {
   if (cvtChartInst) { cvtChartInst.destroy(); cvtChartInst = null; }
 
   const isUp = parseFloat(chgPct) >= 0;
-  const lineColor = isUp ? "#4ade80" : "#f87171";
-  const gradColor = isUp ? "rgba(74,222,128,.18)" : "rgba(248,113,113,.12)";
+  const lineColor = isUp ? "#10B981" : "#EF4444";
+  const gradColor = isUp ? "rgba(16,185,129,.15)" : "rgba(239,68,68,.10)";
 
   const ctx = canvas.getContext("2d");
   const grad = ctx.createLinearGradient(0, 0, 0, canvas.offsetHeight || 120);
   grad.addColorStop(0, gradColor);
-  grad.addColorStop(1, "rgba(0,0,0,0)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
 
   cvtChartInst = new Chart(canvas, {
     type: "line",
@@ -1412,7 +1412,7 @@ async function cvtLoadChart() {
       scales: {
         x: { display: false },
         y: {
-          grid: { color: "rgba(45,27,105,.3)" },
+          grid: { color: "rgba(226,232,240,.8)" },
           ticks: { color: "var(--muted)", maxTicksLimit: 4,
             callback: v => v.toFixed(3) },
         },
