@@ -129,6 +129,59 @@
         <div class="cvt-stat-row" id="cvt-stat-row"></div>
       </div>
 
+      <!-- ── 10-day CHF/INR Prediction ──────────────────────── -->
+      <div class="cvt-forecast-card" id="cvt-forecast-card">
+        <div class="cvt-forecast-header">
+          <div>
+            <div class="cvt-forecast-title">CHF → INR Prediction</div>
+            <div class="cvt-forecast-sub">10-day daily forecast · Monte Carlo fan chart · anchored to live rate</div>
+          </div>
+          <span class="badge badge-blue" id="cvt-fcast-badge">Loading…</span>
+        </div>
+
+        <!-- Fan chart canvas -->
+        <div class="cvt-fcast-chart-wrap">
+          <canvas id="cvt-fcast-chart" height="90"></canvas>
+        </div>
+
+        <!-- Day pills -->
+        <div class="cvt-day-pills" id="cvt-day-pills"></div>
+
+        <!-- Selected day detail -->
+        <div class="cvt-day-detail" id="cvt-day-detail" style="display:none">
+          <div class="cvt-day-detail-date" id="cvt-dd-date"></div>
+          <div class="cvt-day-detail-row">
+            <div class="cvt-dd-stat">
+              <div class="cvt-dd-val" id="cvt-dd-low"></div>
+              <div class="cvt-dd-lbl">Pessimistic (P25)</div>
+            </div>
+            <div class="cvt-dd-stat cvt-dd-mid">
+              <div class="cvt-dd-val" id="cvt-dd-mid"></div>
+              <div class="cvt-dd-lbl">Median (P50)</div>
+            </div>
+            <div class="cvt-dd-stat">
+              <div class="cvt-dd-val" id="cvt-dd-high"></div>
+              <div class="cvt-dd-lbl">Optimistic (P75)</div>
+            </div>
+          </div>
+          <div class="cvt-dd-note">
+            Forecast 1&nbsp;CHF&nbsp;→&nbsp;<span id="cvt-dd-send">1,000</span>&nbsp;CHF&nbsp;=&nbsp;
+            <strong id="cvt-dd-result"></strong>&nbsp;INR at median rate
+          </div>
+        </div>
+
+        <!-- Daily summary table -->
+        <div class="cvt-fcast-table-wrap">
+          <table class="cvt-fcast-table">
+            <thead><tr>
+              <th>Date</th><th>Day</th>
+              <th>Low (P25)</th><th>Median (P50)</th><th>High (P75)</th>
+            </tr></thead>
+            <tbody id="cvt-fcast-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </section>
 

@@ -1421,6 +1421,228 @@ async function cvtLoadChart() {
   });
 }
 
+/* ── 10-day CHF/INR Prediction Fan Chart ────────────────── */
+let cvtFcastChart = null;
+let cvtFcastData  = null;   // raw whatif response cached
+let cvtFcastDay   = 0;      // 0-based selected day index
+
+async function cvtLoadForecast() {
+  const card = document.getElementById("cvt-forecast-card");
+  if (!card) return;
+
+  const liveSpot = liveRates?.["CHF/INR"] ?? null;
+
+  let resp;
+  try {
+    resp = await fetch("/api/whatif", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pair: "CHF/INR",
+        horizon: 10,
+        params: {},
+        spot_override: liveSpot,
+      }),
+    });
+    if (!resp.ok) throw new Error("bad status");
+    resp = await resp.json();
+  } catch (e) {
+    const badge = document.getElementById("cvt-fcast-badge");
+    if (badge) { badge.textContent = "Unavailable"; badge.className = "badge badge-red"; }
+    return;
+  }
+
+  cvtFcastData = resp;
+
+  // Anchor all percentiles to live rate so they match the converter display
+  const modelSpot = resp.scenario?.current_spot ?? null;
+  const scale = (liveSpot && modelSpot) ? liveSpot / modelSpot : 1;
+
+  const fan = resp.scenario?.fan ?? resp.base?.fan;
+  if (!fan) return;
+
+  const dates = resp.dates;                                // ["2026-06-24", …]
+  const p5    = fan.p5 .map(v => parseFloat((v * scale).toFixed(4)));
+  const p25   = fan.p25.map(v => parseFloat((v * scale).toFixed(4)));
+  const p50   = fan.p50.map(v => parseFloat((v * scale).toFixed(4)));
+  const p75   = fan.p75.map(v => parseFloat((v * scale).toFixed(4)));
+  const p95   = fan.p95.map(v => parseFloat((v * scale).toFixed(4)));
+
+  // Store scaled arrays for day-detail use
+  cvtFcastData._scaled = { dates, p5, p25, p50, p75, p95 };
+
+  // ── Badge
+  const badge = document.getElementById("cvt-fcast-badge");
+  if (badge) {
+    badge.textContent = liveSpot ? "LIVE anchored" : "MODEL";
+    badge.className   = liveSpot ? "badge badge-green" : "badge badge-yellow";
+  }
+
+  // ── Fan chart
+  const canvas = document.getElementById("cvt-fcast-chart");
+  if (!canvas) return;
+  if (cvtFcastChart) { cvtFcastChart.destroy(); cvtFcastChart = null; }
+
+  const labels = dates.map((d, i) => {
+    const dt = new Date(d + "T00:00:00");
+    return dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+  });
+
+  cvtFcastChart = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        // Outer shaded P5–P95 band
+        {
+          label: "P95", data: p95,
+          borderColor: "rgba(79,70,229,.18)", borderWidth: 1,
+          borderDash: [4, 3],
+          pointRadius: 0, fill: "+1",
+          backgroundColor: "rgba(79,70,229,.06)",
+        },
+        {
+          label: "P75", data: p75,
+          borderColor: "rgba(79,70,229,.3)", borderWidth: 1,
+          pointRadius: 0, fill: "+1",
+          backgroundColor: "rgba(79,70,229,.10)",
+        },
+        {
+          label: "P50 (Median)", data: p50,
+          borderColor: "#4F46E5", borderWidth: 2.5,
+          pointRadius: 4, pointBackgroundColor: "#4F46E5",
+          pointHoverRadius: 6,
+          fill: "+1",
+          backgroundColor: "rgba(79,70,229,.10)",
+        },
+        {
+          label: "P25", data: p25,
+          borderColor: "rgba(79,70,229,.3)", borderWidth: 1,
+          pointRadius: 0, fill: "+1",
+          backgroundColor: "rgba(79,70,229,.06)",
+        },
+        {
+          label: "P5", data: p5,
+          borderColor: "rgba(79,70,229,.18)", borderWidth: 1,
+          borderDash: [4, 3],
+          pointRadius: 0, fill: false,
+          backgroundColor: "transparent",
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const labels = ["P95", "P75", "Median (P50)", "P25", "P5"];
+              return `${labels[ctx.datasetIndex]}: ${ctx.parsed.y.toFixed(4)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: "#94A3B8", font: { size: 10 } }, grid: { color: "rgba(226,232,240,.8)" } },
+        y: {
+          ticks: { color: "#94A3B8", maxTicksLimit: 5, callback: v => v.toFixed(2) },
+          grid: { color: "rgba(226,232,240,.8)" },
+        },
+      },
+      onClick: (event, elements, chart) => {
+        if (elements.length) cvtSelectFcastDay(elements[0].index);
+      },
+    },
+  });
+
+  // ── Day pills
+  cvtRenderDayPills(dates, p50);
+
+  // ── Daily table
+  cvtRenderFcastTable(dates, p25, p50, p75);
+
+  // Select day 0 by default
+  cvtSelectFcastDay(0);
+}
+
+function cvtRenderDayPills(dates, p50) {
+  const container = document.getElementById("cvt-day-pills");
+  if (!container) return;
+  container.innerHTML = "";
+  dates.forEach((d, i) => {
+    const dt = new Date(d + "T00:00:00");
+    const label = dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+    const pill = document.createElement("button");
+    pill.className = "cvt-day-pill";
+    pill.dataset.idx = i;
+    pill.innerHTML = `<span style="display:block;font-size:.65rem;opacity:.7">Day ${i + 1}</span>${label}`;
+    pill.addEventListener("click", () => cvtSelectFcastDay(i));
+    container.appendChild(pill);
+  });
+}
+
+function cvtRenderFcastTable(dates, p25, p50, p75) {
+  const tbody = document.getElementById("cvt-fcast-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  dates.forEach((d, i) => {
+    const dt = new Date(d + "T00:00:00");
+    const dateStr = dt.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
+    const tr = document.createElement("tr");
+    tr.dataset.idx = i;
+    tr.className = "fcast-table-row";
+    tr.innerHTML = `
+      <td>${dateStr}</td>
+      <td>Day ${i + 1}</td>
+      <td>${p25[i].toFixed(4)}</td>
+      <td class="fcast-p50">${p50[i].toFixed(4)}</td>
+      <td>${p75[i].toFixed(4)}</td>
+    `;
+    tr.addEventListener("click", () => cvtSelectFcastDay(i));
+    tbody.appendChild(tr);
+  });
+}
+
+function cvtSelectFcastDay(idx) {
+  cvtFcastDay = idx;
+  const d = cvtFcastData?._scaled;
+  if (!d) return;
+
+  // Highlight pill
+  document.querySelectorAll(".cvt-day-pill").forEach((p, i) => {
+    p.classList.toggle("active", i === idx);
+  });
+
+  // Highlight table row
+  document.querySelectorAll(".fcast-table-row").forEach((r, i) => {
+    r.classList.toggle("fcast-row-active", i === idx);
+  });
+
+  // Update chart point highlight via annotation would need plugin; skip for simplicity
+  // Show detail panel
+  const detail = document.getElementById("cvt-day-detail");
+  if (!detail) return;
+  detail.style.display = "block";
+
+  const dt = new Date(d.dates[idx] + "T00:00:00");
+  const dateStr = dt.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  document.getElementById("cvt-dd-date").textContent = `Day ${idx + 1} · ${dateStr}`;
+  document.getElementById("cvt-dd-low") .textContent = d.p25[idx].toFixed(4);
+  document.getElementById("cvt-dd-mid") .textContent = d.p50[idx].toFixed(4);
+  document.getElementById("cvt-dd-high").textContent = d.p75[idx].toFixed(4);
+
+  // Calculate converted amount from current send-amount input
+  const sendAmt = parseFloat(document.getElementById("cvt-send-amt")?.value || 1000);
+  const result  = sendAmt * d.p50[idx];
+  document.getElementById("cvt-dd-send")  .textContent = cvtFormatAmount(sendAmt, "CHF");
+  document.getElementById("cvt-dd-result").textContent = cvtFormatAmount(result, "INR");
+}
+
 function initConverter() {
   if (cvtConverterReady) return;
   cvtConverterReady = true;
@@ -1465,6 +1687,7 @@ function initConverter() {
 
   cvtUpdateWidget();
   cvtLoadChart();
+  cvtLoadForecast();
 }
 
 /* ── Boot ────────────────────────────────────────────────── */

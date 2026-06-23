@@ -563,6 +563,95 @@ td.num { font-variant-numeric: tabular-nums; text-align: right; }
 .cvt-stat-val { font-size: .95rem; font-weight: 700; color: var(--text); }
 .cvt-stat-lbl { font-size: .63rem; color: var(--subtle); margin-top: 2px; letter-spacing: .4px; text-transform: uppercase; }
 
+/* ── 10-day CHF/INR Forecast card ─────────────────────── */
+.cvt-forecast-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+.cvt-forecast-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 20px; gap: 12px; flex-wrap: wrap;
+}
+.cvt-forecast-title { font-size: .95rem; font-weight: 700; color: var(--text); }
+.cvt-forecast-sub   { font-size: .72rem; color: var(--muted); margin-top: 3px; }
+
+.cvt-fcast-chart-wrap {
+  position: relative; height: 140px; margin-bottom: 20px;
+}
+.cvt-fcast-chart-wrap canvas { height: 100% !important; }
+
+/* Day pills */
+.cvt-day-pills {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.cvt-day-pill {
+  padding: 5px 12px; border-radius: 20px; cursor: pointer;
+  font-size: .72rem; font-weight: 600; border: 1px solid var(--border);
+  background: var(--surface2); color: var(--muted);
+  transition: all .15s; white-space: nowrap;
+}
+.cvt-day-pill:hover  { border-color: var(--accent); color: var(--accent); }
+.cvt-day-pill.active {
+  background: var(--accent); border-color: var(--accent);
+  color: #fff; box-shadow: 0 2px 6px rgba(79,70,229,.3);
+}
+
+/* Selected day detail panel */
+.cvt-day-detail {
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px; margin-bottom: 20px;
+}
+.cvt-day-detail-date {
+  font-size: .78rem; font-weight: 700; color: var(--accent);
+  letter-spacing: .5px; margin-bottom: 12px;
+  text-transform: uppercase;
+}
+.cvt-day-detail-row {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; margin-bottom: 14px;
+}
+.cvt-dd-stat { text-align: center; }
+.cvt-dd-val  { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+.cvt-dd-lbl  { font-size: .63rem; color: var(--subtle); margin-top: 3px; text-transform: uppercase; letter-spacing: .4px; }
+.cvt-dd-mid .cvt-dd-val { font-size: 1.2rem; color: var(--accent); }
+.cvt-dd-note {
+  font-size: .72rem; color: var(--muted); text-align: center;
+  border-top: 1px solid var(--border); padding-top: 10px;
+}
+
+/* Daily table */
+.cvt-fcast-table-wrap {
+  overflow-x: auto; border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+.cvt-fcast-table {
+  width: 100%; border-collapse: collapse;
+  font-size: .78rem;
+}
+.cvt-fcast-table th {
+  background: var(--surface2); padding: 9px 14px;
+  text-align: right; font-weight: 600; color: var(--muted);
+  font-size: .68rem; letter-spacing: .4px; text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.cvt-fcast-table th:first-child,
+.cvt-fcast-table th:nth-child(2) { text-align: left; }
+.cvt-fcast-table td {
+  padding: 9px 14px; text-align: right;
+  border-bottom: 1px solid var(--border); color: var(--text);
+}
+.cvt-fcast-table td:first-child,
+.cvt-fcast-table td:nth-child(2) { text-align: left; color: var(--muted); }
+.cvt-fcast-table tr:last-child td { border-bottom: none; }
+.cvt-fcast-table tr:hover td { background: var(--surface2); }
+.cvt-fcast-table tr.fcast-row-active td { background: var(--accent-bg); }
+.cvt-fcast-table .fcast-p50 { font-weight: 700; color: var(--accent); }
+
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 768px) {
   main   { padding: 16px; }
